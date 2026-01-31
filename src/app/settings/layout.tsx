@@ -27,13 +27,13 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
   const router = useRouter();
 
   return (
-    <div className="flex h-screen bg-neutral-950 text-white overflow-hidden font-sans w-full">
+    <div className="flex h-screen bg-background text-foreground overflow-hidden font-sans w-full">
       {/* Settings Sidebar */}
-      <aside className="w-64 border-r border-white/5 bg-black flex flex-col">
-        <div className="p-6 border-b border-white/5">
+      <aside className="w-64 border-r border-border bg-muted/30 flex flex-col">
+        <div className="p-6 border-b border-border">
           <button 
             onClick={() => router.push('/studio')}
-            className="flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-neutral-500 hover:text-white transition-colors group"
+            className="flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-muted-foreground hover:text-foreground transition-colors group"
           >
             <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" />
             Back to App
@@ -51,8 +51,8 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
                 className={cn(
                   "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all",
                   isActive 
-                    ? "bg-white text-black font-medium" 
-                    : "text-neutral-400 hover:bg-white/5 hover:text-white"
+                    ? "bg-primary text-primary-foreground font-medium" 
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
                 )}
               >
                 <item.icon size={16} />
@@ -64,7 +64,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto bg-neutral-950 p-12" data-lenis-prevent>
+      <main className="flex-1 overflow-y-auto bg-background p-12" data-lenis-prevent>
         <div className="max-w-2xl mx-auto">
           {children}
         </div>

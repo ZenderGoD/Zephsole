@@ -6,6 +6,8 @@ import { useWorkshop } from "@/hooks/use-workshop";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { H1, H3, P, Muted } from "@/components/ui/typography";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function MembersPage() {
   const { activeWorkshopId } = useWorkshop();
@@ -23,8 +25,9 @@ export default function MembersPage() {
           role: "member" 
         });
         alert("Invited successfully!");
-      } catch (e: any) {
-        alert(e.message);
+      } catch (e) {
+        const errorMessage = e instanceof Error ? e.message : 'Failed to invite member';
+        alert(errorMessage);
       }
     }
   };
@@ -33,8 +36,8 @@ export default function MembersPage() {
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-light tracking-tighter">Team Members</h1>
-          <p className="text-sm text-neutral-500 mt-1">Manage who has access to this design studio.</p>
+          <H1 className="text-2xl font-light tracking-tighter">Team Members</H1>
+          <P className="text-sm text-neutral-500 mt-1">Manage who has access to this design studio.</P>
         </div>
         <Button 
           onClick={handleInvite}
@@ -50,19 +53,19 @@ export default function MembersPage() {
           <div key={member._id} className="flex items-center justify-between p-4 bg-neutral-900/50 border border-white/5 rounded-xl">
             <div className="flex items-center gap-4">
               <Avatar className="h-10 w-10 border border-white/10">
-                <AvatarImage src={member.image} alt={member.name} />
+                <AvatarImage src={member.image || undefined} alt={member.name} />
                 <AvatarFallback className="bg-neutral-800 text-xs font-bold">
-                  {member.name?.split(' ').map((n: string) => n[0]).join('')}
+                  {member.name?.split(' ').map((n) => n[0]).join('')}
                 </AvatarFallback>
               </Avatar>
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-medium">{member.name}</h3>
+                  <H3 className="text-sm font-medium">{member.name}</H3>
                   <span className="px-1.5 py-0.5 bg-white/10 rounded text-[8px] uppercase tracking-widest font-bold">
                     {member.role}
                   </span>
                 </div>
-                <p className="text-xs text-neutral-500">{member.email}</p>
+                <Muted className="text-xs">{member.email}</Muted>
               </div>
             </div>
             <Button variant="ghost" size="icon" className="text-neutral-500">
@@ -73,7 +76,7 @@ export default function MembersPage() {
         {!members && (
           <div className="space-y-2">
             {[1, 2].map((i) => (
-              <div key={i} className="h-20 w-full bg-white/5 animate-pulse rounded-xl" />
+              <Skeleton key={i} className="h-20 w-full rounded-xl" />
             ))}
           </div>
         )}

@@ -14,35 +14,57 @@ export const getBaseline = query({
 export const updateBaseline = mutation({
   args: { 
     projectId: v.id("projects"),
-    sizeRun: v.object({
+    unitSystem: v.optional(v.union(v.literal("mm"), v.literal("us"), v.literal("eu"), v.literal("cm"))),
+    sizeRun: v.optional(v.object({
       system: v.string(),
       sizes: v.array(v.number()),
-      widths: v.array(v.string()),
-    }),
+      widths: v.optional(v.array(v.string())),
+    })),
     lastShape: v.optional(v.string()),
     heelHeight: v.optional(v.number()),
     toeSpring: v.optional(v.number()),
+    measurements: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
+    if (args.unitSystem) {
+      await ctx.db.patch(args.projectId, { unitSystem: args.unitSystem });
+    }
+
     const existing = await ctx.db
       .query("productBaselines")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
       .first();
 
+    const updateFields: {
+      sizeRun?: { system: string; sizes: number[]; widths: string[] };
+      lastShape?: string;
+      heelHeight?: number;
+      toeSpring?: number;
+      measurements?: Record<string, unknown>;
+    } = {};
+    if (args.sizeRun) {
+      updateFields.sizeRun = {
+        system: args.sizeRun.system,
+        sizes: args.sizeRun.sizes,
+        widths: args.sizeRun.widths || [],
+      };
+    }
+    if (args.lastShape !== undefined) updateFields.lastShape = args.lastShape;
+    if (args.heelHeight !== undefined) updateFields.heelHeight = args.heelHeight;
+    if (args.toeSpring !== undefined) updateFields.toeSpring = args.toeSpring;
+    if (args.measurements !== undefined) updateFields.measurements = args.measurements;
+
     if (existing) {
-      await ctx.db.patch(existing._id, {
-        sizeRun: args.sizeRun,
-        lastShape: args.lastShape,
-        heelHeight: args.heelHeight,
-        toeSpring: args.toeSpring,
-      });
+      await ctx.db.patch(existing._id, updateFields);
     } else {
       await ctx.db.insert("productBaselines", {
         projectId: args.projectId,
-        sizeRun: args.sizeRun,
-        lastShape: args.lastShape,
-        heelHeight: args.heelHeight,
-        toeSpring: args.toeSpring,
+        sizeRun: args.sizeRun ? {
+          system: args.sizeRun.system,
+          sizes: args.sizeRun.sizes,
+          widths: args.sizeRun.widths || [],
+        } : { system: "US", sizes: [], widths: [] },
+        ...updateFields,
       });
     }
   },

@@ -4,6 +4,7 @@ import { IBM_Plex_Sans, IBM_Plex_Mono, Bebas_Neue, Geist_Mono, Instrument_Serif 
 import { Analytics } from "@vercel/analytics/next"
 import { SmoothScroll } from "@/components/smooth-scroll"
 import { ConvexClientProvider } from "@/components/ConvexClientProvider"
+import { ThemeProvider } from "@/components/theme-provider"
 import "./globals.css"
 
 const ibmPlexSans = IBM_Plex_Sans({
@@ -43,15 +44,22 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className="dark bg-background">
+    <html lang="en" suppressHydrationWarning>
       <body
         className={`${ibmPlexSans.variable} ${bebasNeue.variable} ${ibmPlexMono.variable} ${geistMono.variable} ${instrumentSerif.variable} antialiased overflow-x-hidden`}
       >
-        <ConvexClientProvider>
-          <div className="noise-overlay" aria-hidden="true" />
-          <SmoothScroll>{children}</SmoothScroll>
-          <Analytics />
-        </ConvexClientProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <ConvexClientProvider>
+            <div className="noise-overlay" aria-hidden="true" />
+            <SmoothScroll>{children}</SmoothScroll>
+            <Analytics />
+          </ConvexClientProvider>
+        </ThemeProvider>
       </body>
     </html>
   )

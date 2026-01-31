@@ -28,8 +28,13 @@ export const saveMediaRecord = mutation({
     const bucket = requiredEnv("R2_BUCKET_NAME");
     const accountId = getAccountId();
 
-    if (!args.objectKey.startsWith(`projects/${args.projectId}/`)) {
-      throw new Error("Object key does not belong to project");
+    // Allow both project-specific paths and generated/ paths
+    const isValidKey = 
+      args.objectKey.startsWith(`projects/${args.projectId}/`) ||
+      args.objectKey.startsWith(`generated/`);
+    
+    if (!isValidKey) {
+      throw new Error(`Object key does not belong to project. Expected projects/${args.projectId}/ or generated/, got: ${args.objectKey}`);
     }
 
     const url = `${publicBaseUrl(bucket, accountId)}/${args.objectKey}`;

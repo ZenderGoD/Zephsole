@@ -22,21 +22,7 @@ export default function StudioPage() {
     }
 
     if (session && activeWorkshopId && activeWorkshopSlug && projects !== undefined) {
-      if (projects.length > 0) {
-        // Redirect to the latest project
-        router.push(`/${activeWorkshopSlug}/threads/${projects[0].slug}`);
-      } else {
-        // Create a default project if none exists
-        const initProject = async () => {
-          const slug = await createProject({
-            name: "Untitled Prototype",
-            workshopId: activeWorkshopId,
-            userId: session.user.id
-          });
-          router.push(`/${activeWorkshopSlug}/threads/${slug}`);
-        };
-        initProject();
-      }
+      router.push(`/${activeWorkshopSlug}/genshoes`);
     }
   }, [session, isPending, activeWorkshopSlug, activeWorkshopId, projects, router, createProject]);
 

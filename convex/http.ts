@@ -4,6 +4,6 @@ import { authComponent } from "./auth";
 
 const http = httpRouter();
 
-authComponent.registerRoutes(http, createAuth);
+authComponent.registerRoutes(http, createAuth as any);
 
 export default http;

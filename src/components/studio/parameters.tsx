@@ -5,6 +5,8 @@ import { Ruler, Activity, Layers, Coins, Box, Palette } from 'lucide-react';
 import { useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { Id } from '../../../convex/_generated/dataModel';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface ParameterPanelProps {
   mode: GenMode;
@@ -40,40 +42,46 @@ export function ParameterPanel({ mode, projectId }: ParameterPanelProps) {
   }[mode];
 
   return (
-    <aside className="w-72 border-l border-white/5 bg-black flex flex-col z-30 h-screen overflow-hidden">
-      <div className="p-6 border-b border-white/5">
-        <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-neutral-500">Analytics</h3>
+    <aside className="w-72 border-l border-border bg-background flex flex-col z-30 h-screen overflow-hidden">
+      <div className="p-6 border-b border-border">
+        <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Analytics</h3>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-8" data-lenis-prevent>
+      <ScrollArea className="flex-1" data-lenis-prevent>
+        <div className="p-6 space-y-8">
         {/* Design Summary Section */}
         {designContext && (
           <section className="space-y-4">
-            <div className="flex items-center gap-2 mb-2 text-neutral-400">
+            <div className="flex items-center gap-2 mb-2 text-muted-foreground">
               <Box size={14} />
               <h4 className="text-[10px] uppercase font-bold tracking-widest">Design Blueprint</h4>
             </div>
-            <div className="bg-white/5 border border-white/5 rounded-xl p-4 space-y-3">
+            <div className="bg-muted border border-border rounded-xl p-4 space-y-3">
               <div className="flex flex-col gap-1">
-                <span className="text-[8px] uppercase tracking-widest text-neutral-500 font-mono">Footwear Type</span>
-                <span className="text-xs font-medium text-white">{designContext.footwearType || 'Unassigned'}</span>
+                <span className="text-[8px] uppercase tracking-widest text-muted-foreground font-mono">Footwear Type</span>
+                <span className="text-xs font-medium text-foreground">{designContext.footwearType || 'Unassigned'}</span>
               </div>
               <div className="flex flex-col gap-1">
-                <span className="text-[8px] uppercase tracking-widest text-neutral-500 font-mono">Aesthetic Vibe</span>
-                <span className="text-xs font-medium text-white">{designContext.aestheticVibe || 'Establishing...'}</span>
+                <span className="text-[8px] uppercase tracking-widest text-muted-foreground font-mono">Aesthetic Vibe</span>
+                <span className="text-xs font-medium text-foreground">{designContext.aestheticVibe || 'Establishing...'}</span>
               </div>
               
               {designContext.colorPalette && designContext.colorPalette.length > 0 && (
                 <div className="flex flex-col gap-2 pt-1">
-                  <span className="text-[8px] uppercase tracking-widest text-neutral-500 font-mono">Color Palette</span>
+                  <span className="text-[8px] uppercase tracking-widest text-muted-foreground font-mono">Color Palette</span>
                   <div className="flex gap-1.5">
                     {designContext.colorPalette.map((c, i) => (
-                      <div 
-                        key={i} 
-                        className="w-4 h-4 rounded-full border border-white/10 ring-1 ring-black shadow-inner" 
-                        style={{ backgroundColor: c.hex }}
-                        title={c.name}
-                      />
+                      <Tooltip key={i}>
+                        <TooltipTrigger asChild>
+                          <div 
+                            className="w-4 h-4 rounded-full border border-border ring-1 ring-background shadow-inner cursor-pointer" 
+                            style={{ backgroundColor: c.hex }}
+                          />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{c.name}</p>
+                        </TooltipContent>
+                      </Tooltip>
                     ))}
                   </div>
                 </div>
@@ -83,24 +91,24 @@ export function ParameterPanel({ mode, projectId }: ParameterPanelProps) {
         )}
 
         <section>
-          <div className="flex items-center gap-2 mb-4 text-neutral-400">
+          <div className="flex items-center gap-2 mb-4 text-muted-foreground">
             <Coins size={14} />
             <h4 className="text-[10px] uppercase font-bold tracking-widest">Costing Matrix</h4>
           </div>
-          <div className="space-y-3 bg-neutral-900/30 p-4 rounded-xl border border-white/5">
+          <div className="space-y-3 bg-muted/30 p-4 rounded-xl border border-border">
             <div className="flex justify-between items-center h-4">
-              <span className="text-[10px] text-neutral-500">Material Cost</span>
-              <span className="text-xs font-mono text-neutral-300">
+              <span className="text-[10px] text-muted-foreground">Material Cost</span>
+              <span className="text-xs font-mono text-foreground">
                 {bom?.totalEstimatedCost ? `${bom.currency || 'USD'} ${bom.totalEstimatedCost.toFixed(2)}` : "--"}
               </span>
             </div>
             <div className="flex justify-between items-center h-4">
-              <span className="text-[10px] text-neutral-500">BOM Items</span>
-              <span className="text-xs font-mono text-neutral-300">{bom?.items?.length || 0}</span>
+              <span className="text-[10px] text-muted-foreground">BOM Items</span>
+              <span className="text-xs font-mono text-foreground">{bom?.items?.length || 0}</span>
             </div>
-            <div className="pt-2 border-t border-white/5 flex justify-between items-center mt-2 h-6">
-              <span className="text-[10px] text-white font-medium">Total MFG Cost</span>
-              <span className="text-xs font-mono text-emerald-400 font-bold">
+            <div className="pt-2 border-t border-border flex justify-between items-center mt-2 h-6">
+              <span className="text-[10px] text-foreground font-medium">Total MFG Cost</span>
+              <span className="text-xs font-mono text-emerald-500 font-bold">
                 {bom?.totalEstimatedCost ? `${bom.currency || 'USD'} ${bom.totalEstimatedCost.toFixed(2)}` : "--"}
               </span>
             </div>
@@ -108,7 +116,7 @@ export function ParameterPanel({ mode, projectId }: ParameterPanelProps) {
         </section>
 
         <section>
-          <div className="flex items-center gap-2 mb-4 text-neutral-400">
+          <div className="flex items-center gap-2 mb-4 text-muted-foreground">
             <Activity size={14} />
             <h4 className="text-[10px] uppercase font-bold tracking-widest">Specifications</h4>
           </div>
@@ -117,21 +125,22 @@ export function ParameterPanel({ mode, projectId }: ParameterPanelProps) {
               return (
                 <div key={i} className="flex flex-col gap-1.5">
                   <div className="flex justify-between items-center text-[10px] uppercase tracking-tighter h-4">
-                    <span className="text-neutral-500">{param.label}</span>
-                    <span className="text-neutral-300 font-mono">{param.value || ""}</span>
+                    <span className="text-muted-foreground">{param.label}</span>
+                    <span className="text-foreground font-mono">{param.value || ""}</span>
                   </div>
-                  <div className="h-1 bg-neutral-800 rounded-full overflow-hidden">
-                    <div className="h-full bg-neutral-600 rounded-full transition-all duration-1000" style={{ width: `0%` }} />
+                  <div className="h-1 bg-muted rounded-full overflow-hidden">
+                    <div className="h-full bg-muted-foreground rounded-full transition-all duration-1000" style={{ width: `0%` }} />
                   </div>
                 </div>
               );
             })}
           </div>
         </section>
-      </div>
+        </div>
+      </ScrollArea>
 
-      <div className="p-6 border-t border-white/5">
-        <button className="w-full h-10 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[10px] uppercase font-bold tracking-[0.2em] transition-all text-neutral-500 hover:text-white">
+      <div className="p-6 border-t border-border">
+        <button className="w-full h-10 bg-primary text-primary-foreground hover:bg-primary/90 border border-border rounded-xl text-[10px] uppercase font-bold tracking-[0.2em] transition-all">
           Export Build Data
         </button>
       </div>

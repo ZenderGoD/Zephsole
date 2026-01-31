@@ -10,6 +10,7 @@ import { Icons } from "@/components/ui/icons";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { P, Muted } from "@/components/ui/typography";
 
 export default function LoginPage() {
     const [email, setEmail] = useState("");
@@ -72,9 +73,9 @@ export default function LoginPage() {
                             <span className="w-full border-t" />
                         </div>
                         <div className="relative flex justify-center text-xs uppercase">
-                            <span className="bg-background px-2 text-muted-foreground">
+                            <Muted className="bg-background px-2">
                                 Or continue with email
-                            </span>
+                            </Muted>
                         </div>
                     </div>
                     <form onSubmit={handleEmailSignIn} className="grid gap-4">
@@ -107,12 +108,12 @@ export default function LoginPage() {
                     </form>
                 </CardContent>
                 <CardFooter className="flex flex-col gap-4 text-center">
-                    <p className="text-sm text-muted-foreground">
-                        Don't have an account?{" "}
+                    <P className="text-sm text-muted-foreground">
+                        Don&apos;t have an account?{" "}
                         <Link href="/register" className="underline underline-offset-4 hover:text-primary">
                             Sign Up
                         </Link>
-                    </p>
+                    </P>
                 </CardFooter>
             </Card>
         </div>

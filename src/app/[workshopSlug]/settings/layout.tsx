@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useWorkshop } from '@/hooks/use-workshop';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 export default function WorkspaceSettingsLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -35,7 +36,7 @@ export default function WorkspaceSettingsLayout({ children }: { children: React.
       <aside className="w-64 border-r border-white/5 bg-black flex flex-col">
         <div className="p-6 border-b border-white/5">
           <button 
-            onClick={() => router.push(`/${workshopSlug}/threads/studio`)}
+            onClick={() => router.push(`/${workshopSlug}/research`)}
             className="flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-neutral-500 hover:text-white transition-colors group"
           >
             <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" />
@@ -47,7 +48,8 @@ export default function WorkspaceSettingsLayout({ children }: { children: React.
           </div>
         </div>
 
-        <nav className="flex-1 overflow-y-auto p-4 space-y-1">
+        <ScrollArea className="flex-1">
+          <nav className="p-4 space-y-1">
           {sidebarItems.map((item) => {
             const isActive = pathname === item.href;
             return (
@@ -66,15 +68,18 @@ export default function WorkspaceSettingsLayout({ children }: { children: React.
               </Link>
             );
           })}
-        </nav>
+          </nav>
+        </ScrollArea>
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto bg-neutral-950 p-12" data-lenis-prevent>
-        <div className="max-w-2xl mx-auto">
-          {children}
-        </div>
-      </main>
+      <ScrollArea className="flex-1 bg-neutral-950" data-lenis-prevent>
+        <main className="p-12">
+          <div className="max-w-2xl mx-auto">
+            {children}
+          </div>
+        </main>
+      </ScrollArea>
     </div>
   );
 }

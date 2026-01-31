@@ -1,5 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { Id } from "./_generated/dataModel";
 
 const FREE_CREDITS = 5.00;
 
@@ -51,6 +52,17 @@ export const createWorkshop = mutation({
       createdAt: Date.now(),
     });
 
+    if (credits > 0) {
+      await ctx.db.insert("creditGrants", {
+        workshopId,
+        amount: credits,
+        remaining: credits,
+        startsAt: Date.now(),
+        expiresAt: Date.now() + 30 * 86_400_000, // 30 days
+        source: "signup",
+      });
+    }
+
     await ctx.db.insert("workshopMembers", {
       workshopId,
       userId: args.ownerId,
@@ -93,6 +105,17 @@ export const ensurePersonalWorkshop = mutation({
       credits: credits,
       createdAt: Date.now(),
     });
+
+    if (credits > 0) {
+      await ctx.db.insert("creditGrants", {
+        workshopId,
+        amount: credits,
+        remaining: credits,
+        startsAt: Date.now(),
+        expiresAt: Date.now() + 30 * 86_400_000, // 30 days
+        source: "signup",
+      });
+    }
 
     await ctx.db.insert("workshopMembers", {
       workshopId,
@@ -179,7 +202,7 @@ export const getMembers = query({
 
     const members = [];
     for (const membership of memberships) {
-      const user = await ctx.db.get(membership.userId as any);
+      const user = await ctx.db.get(membership.userId as Id<"user">);
       if (user) {
         members.push({
           ...user,

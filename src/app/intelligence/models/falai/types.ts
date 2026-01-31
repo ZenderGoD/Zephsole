@@ -10,7 +10,7 @@ export interface ImageModelDef {
       currency: string;
       lastUpdated: number;
     };
-    buildInput: (req: any) => Promise<Record<string, unknown>>;
-    run: (input: Record<string, unknown>, ...args: any[]) => Promise<{ url: string; requestId?: string }>;
+    buildInput: (req: Record<string, unknown>) => Promise<Record<string, unknown>>;
+    run: (input: Record<string, unknown>, ...args: unknown[]) => Promise<{ url: string; requestId?: string }>;
   }>;
 }

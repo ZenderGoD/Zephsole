@@ -18,7 +18,7 @@ export default function Page() {
         {session ? (
           <Link 
             href="/studio"
-            className="bg-white text-black px-4 py-1.5 rounded-full text-xs font-medium hover:bg-white/90 transition-colors"
+            className="bg-primary text-primary-foreground px-4 py-1.5 rounded-full text-xs font-medium hover:bg-primary/90 transition-colors"
           >
             Go to Studio
           </Link>
@@ -26,13 +26,13 @@ export default function Page() {
           <>
             <Link 
               href="/login"
-              className="text-white/60 hover:text-white px-4 py-1.5 rounded-full text-xs font-medium transition-colors"
+              className="text-muted-foreground hover:text-foreground px-4 py-1.5 rounded-full text-xs font-medium transition-colors"
             >
               Sign In
             </Link>
             <Link 
               href="/register"
-              className="bg-white text-black px-4 py-1.5 rounded-full text-xs font-medium hover:bg-white/90 transition-colors"
+              className="bg-primary text-primary-foreground px-4 py-1.5 rounded-full text-xs font-medium hover:bg-primary/90 transition-colors"
             >
               Sign Up
             </Link>
@@ -41,12 +41,12 @@ export default function Page() {
       </div>
 
       {/* Toggle */}
-      <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] flex items-center bg-black/50 backdrop-blur-md p-1 rounded-full border border-white/10">
+      <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] flex items-center bg-background/50 backdrop-blur-md p-1 rounded-full border border-border">
         <button
           onClick={() => setActiveTab('gallery')}
           className={cn(
             "px-4 py-1.5 rounded-full text-xs font-medium transition-all duration-300",
-            activeTab === 'gallery' ? "bg-white text-black" : "text-white/60 hover:text-white"
+            activeTab === 'gallery' ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
           )}
         >
           Gallery
@@ -55,7 +55,7 @@ export default function Page() {
           onClick={() => setActiveTab('signal')}
           className={cn(
             "px-4 py-1.5 rounded-full text-xs font-medium transition-all duration-300",
-            activeTab === 'signal' ? "bg-white text-black" : "text-white/60 hover:text-white"
+            activeTab === 'signal' ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
           )}
         >
           Signal

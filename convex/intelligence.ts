@@ -19,6 +19,7 @@ export const sendMessage = mutation({
     content: v.string(),
     type: v.optional(v.string()),
     cardData: v.optional(v.any()),
+    messageId: v.optional(v.string()), // Store useChat message ID for matching
     attachments: v.optional(v.array(v.object({
       mediaId: v.optional(v.id("media")),
       url: v.string(),
@@ -28,17 +29,24 @@ export const sendMessage = mutation({
     }))),
   },
   handler: async (ctx, args) => {
-    await ctx.db.insert("intelligenceThreads", {
+    const insertedId = await ctx.db.insert("intelligenceThreads", {
       projectId: args.projectId,
       role: args.role,
       content: args.content,
       type: args.type || "text",
       cardData: args.cardData,
       attachments: args.attachments,
+      messageId: args.messageId, // Will be updated below if not provided
       timestamp: Date.now(),
     });
     
+    // Update messageId if it wasn't provided (use the inserted _id)
+    if (!args.messageId) {
+      await ctx.db.patch(insertedId, { messageId: insertedId.toString() });
+    }
+    
     await ctx.db.patch(args.projectId, { lastUpdated: Date.now() });
+    return insertedId;
   },
 });
 

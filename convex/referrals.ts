@@ -111,6 +111,15 @@ export const registerReferral = mutation({
         await ctx.db.patch(primaryWorkshop._id, {
           credits: (primaryWorkshop.credits || 0) + MILESTONE_REWARD,
         });
+
+        await ctx.db.insert("creditGrants", {
+          workshopId: primaryWorkshop._id,
+          amount: MILESTONE_REWARD,
+          remaining: MILESTONE_REWARD,
+          startsAt: Date.now(),
+          expiresAt: Date.now() + 30 * 86_400_000,
+          source: "referral",
+        });
         
         await ctx.db.patch(stats._id, {
           lastMilestoneRewardCount: stats.lastMilestoneRewardCount + MILESTONE_SIZE,
@@ -153,6 +162,15 @@ export const processPurchaseReward = internalMutation({
     if (referrerWorkshop) {
       await ctx.db.patch(referrerWorkshop._id, {
         credits: (referrerWorkshop.credits || 0) + rewardAmount,
+      });
+
+      await ctx.db.insert("creditGrants", {
+        workshopId: referrerWorkshop._id,
+        amount: rewardAmount,
+        remaining: rewardAmount,
+        startsAt: Date.now(),
+        expiresAt: Date.now() + 30 * 86_400_000,
+        source: "referral_purchase",
       });
     }
   },

@@ -7,7 +7,7 @@
 export const CREDIT_COSTS = {
   IMAGE_GENERATION_PRO: 0.60, // Google Nano Banana Pro ($0.60)
   IMAGE_GENERATION_BASIC: 0.20, // Google Nano Banana ($0.20)
-  RESEARCH_QUERY: 1.00,         // Standard LLM Search/Analysis ($1.00)
+  RESEARCH_QUERY: 0,             // Standard LLM Search/Analysis (FREE)
   DEEP_RESEARCH_SESSION: 1.00, // Multi-step agentic research ($1.00)
   WEB_SEARCH: 1.00,            // Real-time web search access ($1.00)
   TECHNICAL_DRAFT_GEN: 1.00,   // DXF/STL Generation ($1.00)

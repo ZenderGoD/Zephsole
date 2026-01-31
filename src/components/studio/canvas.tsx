@@ -1,16 +1,17 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
-import { GenMode } from '@/lib/types';
+import { useState, useRef } from 'react';
+import { GenMode, CanvasItem, Id } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { motion, useMotionValue, useTransform } from 'framer-motion';
-import { Maximize2, Minimize2, MousePointer2, Hand, ZoomIn, ZoomOut, Beaker } from 'lucide-react';
+import { motion, useMotionValue } from 'framer-motion';
+import { Maximize2, MousePointer2, Hand, ZoomIn, ZoomOut, Beaker, MessageSquare, ArrowRight } from 'lucide-react';
+import { TechnicalBlueprint } from './technical-blueprint';
 
 interface GenerationCanvasProps {
   mode: GenMode;
   isGenerating: boolean;
-  items?: any[];
-  onItemMove?: (id: any, x: number, y: number) => void;
+  items?: CanvasItem[];
+  onItemMove?: (id: Id<"canvasItems"> | string, x: number, y: number) => void;
 }
 
 export function GenerationCanvas({ mode, isGenerating, items = [], onItemMove }: GenerationCanvasProps) {
@@ -33,7 +34,7 @@ export function GenerationCanvas({ mode, isGenerating, items = [], onItemMove }:
     <div 
       ref={containerRef}
       className={cn(
-        "w-full h-full relative overflow-hidden bg-neutral-950 touch-none",
+        "w-full h-full relative overflow-hidden bg-background touch-none",
         isPanning ? "cursor-grabbing" : "cursor-crosshair"
       )}
       onWheel={handleWheel}
@@ -49,14 +50,14 @@ export function GenerationCanvas({ mode, isGenerating, items = [], onItemMove }:
         style={{ 
           x, y,
           scale,
-          backgroundImage: `radial-gradient(circle at 2px 2px, #333 1px, transparent 0)`,
+          backgroundImage: `radial-gradient(circle at 2px 2px, currentColor 1px, transparent 0)`,
           backgroundSize: '40px 40px',
           width: '500%',
           height: '500%',
           left: '-200%',
           top: '-200%',
         }}
-        className="absolute opacity-20 pointer-events-none" 
+        className="absolute opacity-5 text-muted-foreground pointer-events-none" 
       />
 
       {/* Canvas Content */}
@@ -71,22 +72,22 @@ export function GenerationCanvas({ mode, isGenerating, items = [], onItemMove }:
         <div className="relative pointer-events-auto">
           {/* Main Visual Placeholder */}
           <div className={cn(
-            "relative w-[800px] aspect-video border border-white/5 bg-neutral-900/50 rounded-2xl flex items-center justify-center transition-all duration-1000",
-            isGenerating ? "scale-[1.02] border-white/20" : "scale-100 shadow-2xl shadow-black/50"
+            "relative w-[800px] aspect-video border border-border bg-muted/30 rounded-2xl flex items-center justify-center transition-all duration-1000",
+            isGenerating ? "scale-[1.02] border-primary/20" : "scale-100 shadow-2xl"
           )}>
             {/* ... existing content ... */}
             <div className="flex flex-col items-center gap-6">
-              <div className="text-[10px] uppercase tracking-[0.5em] text-neutral-500 font-mono text-center">
+              <div className="text-[10px] uppercase tracking-[0.5em] text-muted-foreground font-mono text-center">
                 {mode} Intelligence Stage
               </div>
-              <div className="text-2xl font-light tracking-tighter text-neutral-300 text-center">
+              <div className="text-2xl font-light tracking-tighter text-foreground text-center">
                 {isGenerating ? (
                   <span className="flex items-center gap-3">
                     Synthesizing Data Streams
                     <span className="flex gap-1">
-                      <span className="w-1 h-1 bg-white rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                      <span className="w-1 h-1 bg-white rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                      <span className="w-1 h-1 bg-white rounded-full animate-bounce"></span>
+                      <span className="w-1 h-1 bg-foreground rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                      <span className="w-1 h-1 bg-foreground rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                      <span className="w-1 h-1 bg-foreground rounded-full animate-bounce"></span>
                     </span>
                   </span>
                 ) : (
@@ -96,16 +97,16 @@ export function GenerationCanvas({ mode, isGenerating, items = [], onItemMove }:
             </div>
 
             {/* Technical Deco */}
-            <div className="absolute top-6 left-6 font-mono text-[8px] text-neutral-600">
+            <div className="absolute top-6 left-6 font-mono text-[8px] text-muted-foreground/50">
               COORD_X: {x.get().toFixed(0)}<br/>
               COORD_Y: {y.get().toFixed(0)}<br/>
               ZOOM: {(scale * 100).toFixed(0)}%
             </div>
-            <div className="absolute top-6 right-6 font-mono text-[8px] text-neutral-600">
+            <div className="absolute top-6 right-6 font-mono text-[8px] text-muted-foreground/50">
               FPS: 60<br/>LAT: 12ms
             </div>
-            <div className="absolute bottom-6 left-6 w-32 h-px bg-white/10" />
-            <div className="absolute bottom-6 right-6 w-32 h-px bg-white/10" />
+            <div className="absolute bottom-6 left-6 w-32 h-px bg-border" />
+            <div className="absolute bottom-6 right-6 w-32 h-px bg-border" />
           </div>
 
           {/* Render Additional Canvas Items */}
@@ -125,66 +126,95 @@ export function GenerationCanvas({ mode, isGenerating, items = [], onItemMove }:
               }}
               initial={{ x: item.x, y: item.y, opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="absolute p-6 bg-neutral-900/90 backdrop-blur-xl border border-white/10 rounded-2xl w-72 shadow-2xl cursor-grab active:cursor-grabbing pointer-events-auto"
-            >
-              <div className="text-[10px] uppercase tracking-widest text-neutral-500 mb-3 font-mono">
-                {item.type.replace('-', ' ')}
-              </div>
-              {item.type === 'image' && item.data?.imageUrl ? (
-                <div className="space-y-2">
-                  <img 
-                    src={item.data.imageUrl} 
-                    alt={item.data?.title || 'Canvas upload'} 
-                    className="w-full h-40 object-cover rounded-lg border border-white/10"
-                  />
-                  <div className="text-xs text-neutral-300 leading-relaxed">
-                    {item.data?.title || item.data?.content || 'Image upload'}
-                  </div>
-                </div>
-              ) : item.type === 'sole-spec' ? (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Beaker size={14} className="text-emerald-500" />
-                    <span className="text-xs font-bold text-white uppercase tracking-tight">Technical Sole Unit</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                    <div className="space-y-0.5">
-                      <div className="text-[8px] uppercase text-neutral-500">Midsole</div>
-                      <div className="text-[10px] text-white font-medium truncate">{item.data?.data?.midsoleMaterial}</div>
-                    </div>
-                    <div className="space-y-0.5">
-                      <div className="text-[8px] uppercase text-neutral-500">Outsole</div>
-                      <div className="text-[10px] text-white font-medium truncate">{item.data?.data?.outsoleMaterial}</div>
-                    </div>
-                    <div className="space-y-0.5">
-                      <div className="text-[8px] uppercase text-neutral-500">Stack/Drop</div>
-                      <div className="text-[10px] text-white font-medium">{item.data?.data?.stackHeightHeel}/{item.data?.data?.stackHeightForefoot} | {item.data?.data?.drop}mm</div>
-                    </div>
-                    <div className="space-y-0.5">
-                      <div className="text-[8px] uppercase text-neutral-500">Plate</div>
-                      <div className="text-[10px] text-white font-medium">{item.data?.data?.plateType}</div>
-                    </div>
-                  </div>
-                  <div className="pt-2 border-t border-white/5 flex justify-between items-center">
-                    <span className="text-[9px] font-bold text-emerald-400">${item.data?.data?.costEst}</span>
-                    <span className="text-[9px] text-neutral-500">{item.data?.data?.weightEst}g</span>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-xs text-neutral-300 leading-relaxed">
-                  {item.data?.content || 'No intelligence data provided.'}
-                </div>
+              className={cn(
+                "absolute cursor-grab active:cursor-grabbing pointer-events-auto",
+                item.type === 'technical-blueprint' ? "" : "p-6 bg-card/90 backdrop-blur-xl border border-border rounded-2xl w-72 shadow-2xl"
               )}
-              <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between">
-                <div className="flex gap-1">
-                  <div className="w-1 h-1 bg-emerald-500 rounded-full" />
-                  <div className="w-1 h-1 bg-neutral-700 rounded-full" />
-                  <div className="w-1 h-1 bg-neutral-700 rounded-full" />
-                </div>
-                <div className="text-[8px] text-neutral-600 font-mono">
-                  VER: 1.0.2
-                </div>
-              </div>
+            >
+              {item.type === 'technical-blueprint' ? (
+                <TechnicalBlueprint data={item.data} />
+              ) : (
+                <>
+                  <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-3 font-mono flex items-center justify-between">
+                    <span>{item.type.replace('-', ' ')}</span>
+                    {(item.data?.source === 'research' || (item.data?.data as any)?.source === 'research') && (
+                      <span className="bg-emerald-500/10 text-emerald-500 px-1.5 py-0.5 rounded text-[8px] border border-emerald-500/20">
+                        RESEARCH
+                      </span>
+                    )}
+                  </div>
+                  {item.type === 'image' && item.data?.imageUrl ? (
+                    <div className="space-y-2">
+                      <img 
+                        src={item.data.imageUrl} 
+                        alt={item.data?.title || 'Canvas upload'} 
+                        className="w-full h-40 object-cover rounded-lg border border-border"
+                      />
+                      <div className="text-xs text-foreground leading-relaxed">
+                        {item.data?.title || item.data?.content || 'Image upload'}
+                      </div>
+                    </div>
+                  ) : item.type === 'sole-spec' ? (
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Beaker size={14} className="text-emerald-500" />
+                        <span className="text-xs font-bold text-foreground uppercase tracking-tight">Technical Sole Unit</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                        <div className="space-y-0.5">
+                          <div className="text-[8px] uppercase text-muted-foreground">Midsole</div>
+                          <div className="text-[10px] text-foreground font-medium truncate">{item.data?.data?.midsoleMaterial}</div>
+                        </div>
+                        <div className="space-y-0.5">
+                          <div className="text-[8px] uppercase text-muted-foreground">Outsole</div>
+                          <div className="text-[10px] text-foreground font-medium truncate">{item.data?.data?.outsoleMaterial}</div>
+                        </div>
+                        <div className="space-y-0.5">
+                          <div className="text-[8px] uppercase text-muted-foreground">Stack/Drop</div>
+                          <div className="text-[10px] text-foreground font-medium">{item.data?.data?.stackHeightHeel}/{item.data?.data?.stackHeightForefoot} | {item.data?.data?.drop}mm</div>
+                        </div>
+                        <div className="space-y-0.5">
+                          <div className="text-[8px] uppercase text-muted-foreground">Plate</div>
+                          <div className="text-[10px] text-foreground font-medium">{item.data?.data?.plateType}</div>
+                        </div>
+                      </div>
+                      <div className="pt-2 border-t border-border flex justify-between items-center">
+                        <span className="text-[9px] font-bold text-emerald-500">${item.data?.data?.costEst}</span>
+                        <span className="text-[9px] text-muted-foreground">{item.data?.data?.weightEst}g</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-xs text-foreground leading-relaxed">
+                      {item.data?.content || 'No intelligence data provided.'}
+                    </div>
+                  )}
+                  <div className="mt-4 pt-4 border-t border-border flex items-center justify-between">
+                    <div className="flex gap-1">
+                      {(item.data?.source === 'research' || (item.data?.data as any)?.source === 'research') ? (
+                        <button 
+                          onClick={() => {
+                            window.dispatchEvent(new CustomEvent('switch-workspace-mode', { detail: 'research' }));
+                          }}
+                          className="flex items-center gap-1.5 text-[9px] font-bold text-emerald-500 hover:text-emerald-400 transition-colors group"
+                        >
+                          <MessageSquare size={10} />
+                          View in Research
+                          <ArrowRight size={10} className="group-hover:translate-x-0.5 transition-transform" />
+                        </button>
+                      ) : (
+                        <>
+                          <div className="w-1 h-1 bg-emerald-500 rounded-full" />
+                          <div className="w-1 h-1 bg-muted-foreground rounded-full" />
+                          <div className="w-1 h-1 bg-muted-foreground rounded-full" />
+                        </>
+                      )}
+                    </div>
+                    <div className="text-[8px] text-muted-foreground/50 font-mono">
+                      VER: 1.0.2
+                    </div>
+                  </div>
+                </>
+              )}
             </motion.div>
           ))}
         </div>
@@ -192,38 +222,38 @@ export function GenerationCanvas({ mode, isGenerating, items = [], onItemMove }:
 
       {/* Floating Canvas Controls */}
       <div className="absolute top-6 left-6 flex flex-col gap-2 z-40">
-        <div className="bg-neutral-900/80 backdrop-blur-md border border-white/10 rounded-lg p-1 flex flex-col gap-1">
+        <div className="bg-background/80 backdrop-blur-md border border-border rounded-lg p-1 flex flex-col gap-1">
           <button 
             onClick={() => setScale(prev => Math.min(prev + 0.1, 3))}
-            className="p-2 hover:bg-white/5 rounded-md text-neutral-400 hover:text-white transition-colors"
+            className="p-2 hover:bg-muted rounded-md text-muted-foreground hover:text-foreground transition-colors"
           >
             <ZoomIn size={16} />
           </button>
           <button 
             onClick={() => setScale(prev => Math.max(prev - 0.1, 0.2))}
-            className="p-2 hover:bg-white/5 rounded-md text-neutral-400 hover:text-white transition-colors"
+            className="p-2 hover:bg-muted rounded-md text-muted-foreground hover:text-foreground transition-colors"
           >
             <ZoomOut size={16} />
           </button>
-          <div className="h-px bg-white/5 mx-1" />
+          <div className="h-px bg-border mx-1" />
           <button 
             onClick={() => {
               x.set(0);
               y.set(0);
               setScale(1);
             }}
-            className="p-2 hover:bg-white/5 rounded-md text-neutral-400 hover:text-white transition-colors"
+            className="p-2 hover:bg-muted rounded-md text-muted-foreground hover:text-foreground transition-colors"
           >
             <Maximize2 size={16} />
           </button>
         </div>
 
-        <div className="bg-neutral-900/80 backdrop-blur-md border border-white/10 rounded-lg p-1 flex flex-col gap-1">
+        <div className="bg-background/80 backdrop-blur-md border border-border rounded-lg p-1 flex flex-col gap-1">
           <button 
             onClick={() => setIsPanning(false)}
             className={cn(
               "p-2 rounded-md transition-colors",
-              !isPanning ? "bg-white/10 text-white" : "text-neutral-400 hover:text-white"
+              !isPanning ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
             )}
           >
             <MousePointer2 size={16} />
@@ -232,7 +262,7 @@ export function GenerationCanvas({ mode, isGenerating, items = [], onItemMove }:
             onClick={() => setIsPanning(true)}
             className={cn(
               "p-2 rounded-md transition-colors",
-              isPanning ? "bg-white/10 text-white" : "text-neutral-400 hover:text-white"
+              isPanning ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
             )}
           >
             <Hand size={16} />

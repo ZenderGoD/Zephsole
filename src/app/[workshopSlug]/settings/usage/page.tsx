@@ -1,18 +1,60 @@
 'use client';
 
+import { useMemo } from "react";
+import { useQuery } from "convex/react";
 import { CREDIT_COSTS } from "@/lib/constants";
-import { Progress } from "@/components/ui/progress";
-import { Zap, Search, Image as ImageIcon, Ruler } from 'lucide-react';
+import { Zap, Search, Image as ImageIcon, Ruler } from "lucide-react";
 import { useWorkshop } from "@/hooks/use-workshop";
+import { api } from "../../../../../convex/_generated/api";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { H1, H2, P } from "@/components/ui/typography";
 
 export default function UsagePage() {
-  const { activeWorkshop } = useWorkshop();
+  const { activeWorkshop, activeWorkshopId } = useWorkshop();
+
+  const creditBalance = useQuery(
+    api.credits.getAvailableCredits,
+    activeWorkshopId ? { workshopId: activeWorkshopId } : "skip"
+  );
+
+  const redemptions = useQuery(
+    api.credits.listRedemptions,
+    activeWorkshopId ? { workshopId: activeWorkshopId, limit: 50 } : "skip"
+  );
+
+  interface RedemptionRow {
+    id: string;
+    type: string;
+    description: string;
+    amount: number;
+    project: string;
+    date: string;
+  }
+
+  const rows = useMemo((): RedemptionRow[] => {
+    if (!redemptions) return [];
+    return redemptions.map((r) => ({
+      id: r._id,
+      type: r.assetType || "other",
+      description: r.description || "Usage",
+      amount: r.amount,
+      project: r.projectName || (r.projectId ? "Project" : "—"),
+      date: new Date(r.usageAt).toLocaleString(),
+    }));
+  }, [redemptions]);
   
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-light tracking-tighter">Usage & Credits</h1>
-        <p className="text-sm text-neutral-500 mt-1">Monitor your studio's consumption and intelligence credits.</p>
+        <H1 className="text-2xl font-light tracking-tighter">Usage & Credits</H1>
+        <P className="text-sm text-neutral-500 mt-1">Monitor your studio&apos;s consumption and intelligence credits.</P>
       </div>
 
       <div className="p-8 bg-neutral-900 border border-white/10 rounded-3xl relative overflow-hidden">
@@ -23,7 +65,7 @@ export default function UsagePage() {
               Available Credits
             </div>
             <div className="text-5xl font-light tracking-tighter">
-              {activeWorkshop?.credits !== undefined ? activeWorkshop.credits.toLocaleString() : "..."}
+              {creditBalance?.balance !== undefined ? creditBalance.balance.toLocaleString() : "..."}
             </div>
           </div>
           <div className="text-right">
@@ -34,7 +76,7 @@ export default function UsagePage() {
       </div>
 
       <div className="space-y-4">
-        <h2 className="text-[10px] uppercase tracking-[0.2em] text-neutral-500 font-bold px-2">Credit Costing Matrix</h2>
+        <H2 className="text-[10px] uppercase tracking-[0.2em] text-neutral-500 font-bold px-2">Credit Costing Matrix</H2>
         <div className="grid gap-2">
           {[
             { icon: Search, label: 'Research Query', cost: CREDIT_COSTS.RESEARCH_QUERY },
@@ -53,6 +95,47 @@ export default function UsagePage() {
               </div>
             </div>
           ))}
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex items-center justify-between px-2">
+          <H2 className="text-[10px] uppercase tracking-[0.2em] text-neutral-500 font-bold">Recent credit usage</H2>
+          <span className="text-[10px] text-neutral-500">
+            {rows.length} entries
+          </span>
+        </div>
+        <div className="rounded-2xl border border-white/10 bg-neutral-900/50">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Description</TableHead>
+                <TableHead>Project</TableHead>
+                <TableHead className="text-right pr-4">Credits</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center text-neutral-500">
+                    No credit usage yet.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                rows.map((row) => (
+                  <TableRow key={row.id}>
+                    <TableCell className="whitespace-nowrap">{row.date}</TableCell>
+                    <TableCell className="capitalize">{row.type}</TableCell>
+                    <TableCell>{row.description}</TableCell>
+                    <TableCell>{row.project}</TableCell>
+                    <TableCell className="text-right font-mono pr-4">{row.amount}</TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
         </div>
       </div>
     </div>

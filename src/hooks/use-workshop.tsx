@@ -5,13 +5,14 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { authClient } from "@/lib/auth-client";
 import { Id } from "../../convex/_generated/dataModel";
+import { Workshop } from "@/lib/types";
 
 interface WorkshopContextType {
   activeWorkshopId: Id<"workshops"> | null;
   activeWorkshopSlug: string | null;
-  activeWorkshop: any | null;
+  activeWorkshop: Workshop | null;
   setActiveWorkshopId: (id: Id<"workshops">) => void;
-  workshops: any[] | undefined;
+  workshops: Workshop[] | undefined;
   isLoading: boolean;
 }
 
@@ -65,12 +66,17 @@ export function WorkshopProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (workshops && workshops.length > 0) {
       if (!activeWorkshopId) {
-        setActiveWorkshopId(workshops[0]._id);
-        setActiveWorkshopSlug(workshops[0].slug);
+        // Defer state updates to avoid cascading renders
+        setTimeout(() => {
+          setActiveWorkshopId(workshops[0]._id);
+          setActiveWorkshopSlug(workshops[0].slug);
+        }, 0);
       } else {
         const active = workshops.find(w => w._id === activeWorkshopId);
         if (active) {
-          setActiveWorkshopSlug(active.slug);
+          setTimeout(() => {
+            setActiveWorkshopSlug(active.slug);
+          }, 0);
         }
       }
     }

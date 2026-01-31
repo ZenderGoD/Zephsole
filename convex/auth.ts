@@ -1,12 +1,13 @@
 import { betterAuth } from "better-auth";
 import { createClient } from "@convex-dev/better-auth";
 import { components } from "./_generated/api";
+import { QueryCtx } from "./_generated/server";
 
 export const authComponent = createClient(components.betterAuth);
 
-export const createAuth = (ctx: any) => {
+export const createAuth = (ctx: QueryCtx) => {
   return betterAuth({
-    database: authComponent.adapter(ctx),
+    database: authComponent.adapter(ctx as any),
     baseURL: process.env.BETTER_AUTH_URL,
     emailAndPassword: {
       enabled: true,

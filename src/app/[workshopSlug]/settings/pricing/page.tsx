@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { authClient } from "@/lib/auth-client";
+import { H1, H3, P, Muted } from "@/components/ui/typography";
 
 export default function PricingPage() {
   const { data: session } = authClient.useSession();
@@ -34,8 +35,11 @@ export default function PricingPage() {
   // Sync session data when dialog opens
   useEffect(() => {
     if (isEnterpriseOpen && session?.user) {
-      setName(session.user.name || "");
-      setEmail(session.user.email || "");
+      // Defer state updates to avoid cascading renders
+      setTimeout(() => {
+        setName(session.user.name || "");
+        setEmail(session.user.email || "");
+      }, 0);
     }
   }, [isEnterpriseOpen, session]);
 
@@ -56,8 +60,8 @@ export default function PricingPage() {
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-light tracking-tighter">Pricing Plans</h1>
-          <p className="text-sm text-neutral-500 mt-1">Scale your studio's intelligence capabilities.</p>
+          <H1 className="text-2xl font-light tracking-tighter">Pricing Plans</H1>
+          <P className="text-sm text-neutral-500 mt-1">Scale your studio&apos;s intelligence capabilities.</P>
         </div>
 
         {/* Billing Cycle Toggle */}
@@ -110,10 +114,10 @@ export default function PricingPage() {
               
               <div className="flex justify-between items-start">
                 <div>
-                  <h3 className="text-lg font-bold uppercase tracking-widest">{plan.name}</h3>
-                  <p className={cn("text-xs mt-1", plan.name === "Max" ? "text-black/60" : "text-neutral-500")}>
+                  <H3 className="text-lg font-bold uppercase tracking-widest">{plan.name}</H3>
+                  <P className={cn("text-xs mt-1", plan.name === "Max" ? "text-black/60" : "text-neutral-500")}>
                     {plan.description}
-                  </p>
+                  </P>
                 </div>
                 <div className="text-right">
                   <div className="text-2xl font-light tracking-tighter">
@@ -155,10 +159,10 @@ export default function PricingPage() {
         {/* Enterprise Plan */}
         <div className="p-6 border border-white/5 rounded-2xl bg-neutral-900/30 text-white flex flex-col md:flex-row items-center justify-between gap-6">
           <div>
-            <h3 className="text-lg font-bold uppercase tracking-widest">Enterprise</h3>
-            <p className="text-xs text-neutral-500 mt-1">
+            <H3 className="text-lg font-bold uppercase tracking-widest">Enterprise</H3>
+            <P className="text-xs text-neutral-500 mt-1">
               Custom solutions for large scale manufacturing and design teams.
-            </p>
+            </P>
           </div>
           <Button 
             variant="outline"

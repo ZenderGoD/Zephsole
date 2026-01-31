@@ -1,7 +1,6 @@
 "use client";
 
 import { Check, ChevronsUpDown, Plus, Users, Settings } from "lucide-react";
-import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,6 +16,7 @@ import { authClient } from "@/lib/auth-client";
 import { useState } from "react";
 import { Id } from "../../convex/_generated/dataModel";
 import { useRouter } from "next/navigation";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export function WorkshopSwitcher() {
   const { activeWorkshopId, setActiveWorkshopId, workshops, isLoading, activeWorkshopSlug } = useWorkshop();
@@ -28,12 +28,12 @@ export function WorkshopSwitcher() {
 
   const activeWorkshop = workshops?.find((w) => w._id === activeWorkshopId);
 
-  const handleWorkshopChange = (workshop: any) => {
-    setActiveWorkshopId(workshop._id);
-    // When changing workshop, we should probably redirect to its "home" or latest project
-    // For now, let's just update the ID and the URL will follow if we are in a project page
-    // But better to redirect to the workshop root if we have one, or just keep it simple.
-  };
+  // const handleWorkshopChange = (workshop: { _id: Id<"workshops"> }) => {
+  //   setActiveWorkshopId(workshop._id);
+  //   // When changing workshop, we should probably redirect to its "home" or latest project
+  //   // For now, let's just update the ID and the URL will follow if we are in a project page
+  //   // But better to redirect to the workshop root if we have one, or just keep it simple.
+  // };
 
   const handleCreateWorkshop = async () => {
     if (!session?.user) return;
@@ -60,31 +60,32 @@ export function WorkshopSwitcher() {
           role: "member" 
         });
         alert("Invited successfully!");
-      } catch (e: any) {
-        alert(e.message);
+      } catch (e) {
+        const errorMessage = e instanceof Error ? e.message : 'Failed to invite member';
+        alert(errorMessage);
       }
     }
   };
 
   if (isLoading || !activeWorkshop) {
     return (
-      <div className="h-9 w-full bg-white/5 animate-pulse rounded-md" />
+      <Skeleton className="h-9 w-full rounded-md" />
     );
   }
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="flex items-center justify-between w-full px-3 py-2 text-xs font-medium text-white bg-white/5 rounded-md hover:bg-white/10 transition-colors border border-white/10 outline-none">
+      <DropdownMenuTrigger className="flex items-center justify-between w-full px-3 py-2 text-xs font-medium text-foreground bg-accent/50 rounded-md hover:bg-accent transition-colors border border-border outline-none">
         <div className="flex items-center gap-2 truncate">
-          <div className="flex items-center justify-center w-5 h-5 bg-white text-black rounded text-[10px] font-bold">
+          <div className="flex items-center justify-center w-5 h-5 bg-primary text-primary-foreground rounded text-[10px] font-bold">
             {activeWorkshop.name.charAt(0).toUpperCase()}
           </div>
           <span className="truncate">{activeWorkshop.name}</span>
         </div>
-        <ChevronsUpDown className="w-3 h-3 text-neutral-500 shrink-0" />
+        <ChevronsUpDown className="w-3 h-3 text-muted-foreground shrink-0" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-56 bg-neutral-900 border-white/10 text-white" align="start" sideOffset={8}>
-        <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-neutral-500">
+      <DropdownMenuContent className="w-56" align="start" sideOffset={8}>
+        <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground">
           Workshops
         </DropdownMenuLabel>
         {workshops?.map((workshop) => (
@@ -94,20 +95,20 @@ export function WorkshopSwitcher() {
               setActiveWorkshopId(workshop._id);
               router.push("/studio");
             }}
-            className="flex items-center justify-between cursor-pointer focus:bg-white/5"
+            className="flex items-center justify-between cursor-pointer"
           >
             <div className="flex items-center gap-2 truncate">
-              <div className="flex items-center justify-center w-5 h-5 bg-neutral-800 text-white rounded text-[10px] font-medium border border-white/10">
+              <div className="flex items-center justify-center w-5 h-5 bg-muted text-muted-foreground rounded text-[10px] font-medium border border-border">
                 {workshop.name.charAt(0).toUpperCase()}
               </div>
               <span className="truncate text-xs">{workshop.name}</span>
             </div>
             {activeWorkshopId === workshop._id && (
-              <Check className="w-3 h-3 text-white" />
+              <Check className="w-3 h-3" />
             )}
           </DropdownMenuItem>
         ))}
-        <DropdownMenuSeparator className="bg-white/5" />
+        <DropdownMenuSeparator />
         <DropdownMenuItem
           onSelect={() => {
             setTimeout(() => {
@@ -115,7 +116,7 @@ export function WorkshopSwitcher() {
             }, 100);
           }}
           disabled={isCreating}
-          className="flex items-center gap-2 cursor-pointer focus:bg-white/5"
+          className="flex items-center gap-2 cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           <span className="text-xs">Create Workshop</span>
@@ -126,15 +127,15 @@ export function WorkshopSwitcher() {
               handleInvite();
             }, 100);
           }}
-          className="flex items-center gap-2 cursor-pointer focus:bg-white/5"
+          className="flex items-center gap-2 cursor-pointer"
         >
           <Users className="w-4 h-4" />
           <span className="text-xs">Invite Members</span>
         </DropdownMenuItem>
-        <DropdownMenuSeparator className="bg-white/5" />
+        <DropdownMenuSeparator />
         <DropdownMenuItem
           onSelect={() => router.push(`/${activeWorkshopSlug}/settings/general`)}
-          className="flex items-center gap-2 cursor-pointer focus:bg-white/5"
+          className="flex items-center gap-2 cursor-pointer"
         >
           <Settings className="w-4 h-4" />
           <span className="text-xs">Workshop Settings</span>

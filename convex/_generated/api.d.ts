@@ -10,16 +10,28 @@
 
 import type * as auth from "../auth.js";
 import type * as authSchema from "../authSchema.js";
+import type * as backfill from "../backfill.js";
+import type * as credits from "../credits.js";
+import type * as debug from "../debug.js";
 import type * as http from "../http.js";
+import type * as imageGeneration from "../imageGeneration.js";
+import type * as imageGenerations from "../imageGenerations.js";
+import type * as imageWorkflow from "../imageWorkflow.js";
+import type * as inspect from "../inspect.js";
 import type * as intelligence from "../intelligence.js";
 import type * as llm from "../llm.js";
+import type * as local from "../local.js";
 import type * as materials from "../materials.js";
 import type * as media from "../media.js";
 import type * as mediaUploads from "../mediaUploads.js";
+import type * as models from "../models.js";
+import type * as ping from "../ping.js";
+import type * as productAgent from "../productAgent.js";
 import type * as products from "../products.js";
 import type * as projects from "../projects.js";
 import type * as referrals from "../referrals.js";
 import type * as studio from "../studio.js";
+import type * as workflow from "../workflow.js";
 import type * as workshops from "../workshops.js";
 
 import type {
@@ -31,16 +43,28 @@ import type {
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   authSchema: typeof authSchema;
+  backfill: typeof backfill;
+  credits: typeof credits;
+  debug: typeof debug;
   http: typeof http;
+  imageGeneration: typeof imageGeneration;
+  imageGenerations: typeof imageGenerations;
+  imageWorkflow: typeof imageWorkflow;
+  inspect: typeof inspect;
   intelligence: typeof intelligence;
   llm: typeof llm;
+  local: typeof local;
   materials: typeof materials;
   media: typeof media;
   mediaUploads: typeof mediaUploads;
+  models: typeof models;
+  ping: typeof ping;
+  productAgent: typeof productAgent;
   products: typeof products;
   projects: typeof projects;
   referrals: typeof referrals;
   studio: typeof studio;
+  workflow: typeof workflow;
   workshops: typeof workshops;
 }>;
 
@@ -6696,4 +6720,5 @@ export declare const components: {
       >;
     };
   };
+  local: {};
 };

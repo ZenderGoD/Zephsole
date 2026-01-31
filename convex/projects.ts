@@ -1,5 +1,5 @@
 import { mutation, query } from "./_generated/server";
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 
 export const getProjects = query({
   args: { workshopId: v.id("workshops") },
@@ -25,7 +25,7 @@ export const createProject = mutation({
     // Generate a random-looking slug for projects as requested
     const slug = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
     
-    const workshopId = await ctx.db.insert("projects", {
+    const id = await ctx.db.insert("projects", {
       name: args.name,
       slug: slug,
       workshopId: args.workshopId,
@@ -36,7 +36,7 @@ export const createProject = mutation({
       unitSystem: "mm",
     });
 
-    return slug;
+    return { id, slug };
   },
 });
 
@@ -51,6 +51,68 @@ export const renameProject = mutation({
   args: { id: v.id("projects"), name: v.string() },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.id, { name: args.name, lastUpdated: Date.now() });
+  },
+});
+
+export const setProjectStatus = mutation({
+  args: { 
+    id: v.id("projects"), 
+    status: v.union(v.literal("idle"), v.literal("pending"), v.literal("generating"), v.literal("error")),
+    errorMessage: v.optional(v.string())
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.id, { 
+      threadStatus: args.status, 
+      errorMessage: args.errorMessage,
+      lastUpdated: Date.now() 
+    });
+  },
+});
+
+export const enqueueMessage = mutation({
+  args: {
+    projectId: v.id("projects"),
+    prompt: v.string(),
+    attachments: v.optional(v.array(v.any())),
+    userId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const project = await ctx.db.get(args.projectId);
+    if (!project) throw new ConvexError("Project not found");
+
+    const currentQueue = project.messageQueue || [];
+    if (currentQueue.length >= 10) {
+      throw new ConvexError("Message queue is full (max 10 items).");
+    }
+
+    const queueItem = {
+      id: Math.random().toString(36).substring(2, 10),
+      createdAt: Date.now(),
+      createdBy: args.userId,
+      prompt: args.prompt,
+      attachments: args.attachments,
+    };
+
+    await ctx.db.patch(args.projectId, {
+      messageQueue: [...currentQueue, queueItem],
+    });
+  },
+});
+
+export const dequeueMessage = mutation({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
+    const project = await ctx.db.get(args.projectId);
+    if (!project || !project.messageQueue || project.messageQueue.length === 0) return null;
+
+    const [nextItem, ...remaining] = project.messageQueue;
+
+    await ctx.db.patch(args.projectId, {
+      messageQueue: remaining,
+      threadStatus: "pending",
+    });
+
+    return nextItem;
   },
 });
 
@@ -84,6 +146,31 @@ export const updateProjectUnitSystem = mutation({
   },
 });
 
+export const convertToProduct = mutation({
+  args: { 
+    id: v.id("projects"), 
+    name: v.string(), 
+    description: v.optional(v.string()), 
+    imageUrl: v.string() 
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.id, {
+      name: args.name,
+      description: args.description,
+      imageUrl: args.imageUrl,
+      status: "complete", // Mark it as complete/product
+      lastUpdated: Date.now(),
+    });
+  },
+});
+
+export const getProject = query({
+  args: { id: v.id("projects") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.id);
+  },
+});
+
 export const getProjectBySlug = query({
   args: { workshopSlug: v.string(), projectSlug: v.string() },
   handler: async (ctx, args) => {
@@ -103,7 +190,11 @@ export const getProjectBySlug = query({
       return null;
     }
 
-    return project;
+    return {
+      ...project,
+      messageQueue: project.messageQueue || [],
+      threadStatus: project.threadStatus || "idle",
+    };
   },
 });
 

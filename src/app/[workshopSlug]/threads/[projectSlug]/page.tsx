@@ -13,20 +13,34 @@ import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { useWorkshop } from '@/hooks/use-workshop';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../../../convex/_generated/api';
-import { GenMode, WorkspaceMode, PromptPayload } from '@/lib/types';
+import { GenMode, WorkspaceMode, PromptPayload, SendToCanvasArgs, RequestTechnicalBlueprintArgs } from '@/lib/types';
+import { Id } from '../../../../../convex/_generated/dataModel';
+import { BarChart3 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 export default function ProjectPage({ params }: { params: Promise<{ workshopSlug: string, projectSlug: string }> }) {
   const resolvedParams = use(params);
   console.log('Resolved Params:', resolvedParams);
 
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>('research');
-  const [mode, setMode] = useState<GenMode>('research');
+  const [mode] = useState<GenMode>('research');
   const [isGenerating, setIsGenerating] = useState(false);
   const [currentPrompt, setCurrentPrompt] = useState<PromptPayload | null>(null);
+  const [showAnalytics, setShowAnalytics] = useState(false);
 
   const router = useRouter();
   const { data: session, isPending } = authClient.useSession();
   const { setActiveWorkshopId, workshops } = useWorkshop();
+
+  useEffect(() => {
+    const handleSwitchMode = (e: any) => {
+      if (e.detail === 'research' || e.detail === 'studio') {
+        setWorkspaceMode(e.detail);
+      }
+    };
+    window.addEventListener('switch-workspace-mode', handleSwitchMode);
+    return () => window.removeEventListener('switch-workspace-mode', handleSwitchMode);
+  }, []);
 
   const project = useQuery(api.projects.getProjectBySlug, 
     resolvedParams.workshopSlug && resolvedParams.projectSlug 
@@ -42,8 +56,42 @@ export default function ProjectPage({ params }: { params: Promise<{ workshopSlug
   const canvasItems = useQuery(api.studio.getCanvasItems, projectId ? { projectId } : "skip");
   const addCanvasItem = useMutation(api.studio.addCanvasItem);
   const updateCanvasItemPosition = useMutation(api.studio.updateCanvasItemPosition);
+  const renameProject = useMutation(api.projects.renameProject);
+  const dequeueMessage = useMutation(api.projects.dequeueMessage);
 
-  const handleSendToCanvas = async (data: any) => {
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [editName, setEditName] = useState("");
+
+  const handleStartRename = () => {
+    if (!project) return;
+    setEditName(project.name);
+    setIsRenaming(true);
+  };
+
+  const handleHeaderRename = async () => {
+    if (!projectId || !editName.trim()) return;
+    await renameProject({ id: projectId, name: editName.trim() });
+    setIsRenaming(false);
+  };
+
+  const handleGenerationComplete = async () => {
+    setIsGenerating(false);
+    setCurrentPrompt(null);
+
+    // Process next item in queue if available
+    if (projectId) {
+      const nextItem = await dequeueMessage({ projectId });
+      if (nextItem) {
+        setCurrentPrompt({
+          text: nextItem.prompt,
+          attachments: nextItem.attachments || []
+        });
+        setIsGenerating(true);
+      }
+    }
+  };
+
+  const handleSendToCanvas = async (data: SendToCanvasArgs) => {
     if (!projectId) return;
 
     await addCanvasItem({
@@ -57,8 +105,57 @@ export default function ProjectPage({ params }: { params: Promise<{ workshopSlug
     setWorkspaceMode('studio');
   };
 
-  const handleItemMove = async (id: any, x: number, y: number) => {
-    await updateCanvasItemPosition({ id, x, y });
+  const handleGenerateBlueprint = async (data: RequestTechnicalBlueprintArgs) => {
+    const imageUrl = data.imageUrls && data.imageUrls.length > 0 ? data.imageUrls[0] : (data as any).imageUrl || '';
+    if (!projectId) return;
+
+    setIsGenerating(true);
+    
+    // Simulate generation delay
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    await addCanvasItem({
+      projectId,
+      type: 'technical-blueprint',
+      data: {
+        imageUrl,
+        productName: data.productName,
+        timestamp: Date.now(),
+        schematics: [
+          { type: 'Orthographic View', url: imageUrl, description: 'Main product view showing proportions and primary surfaces.' },
+          { type: 'Exploded View', url: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&q=80&w=800', description: 'Internal assembly and layering of materials.' },
+          { type: 'Material Map', url: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?auto=format&fit=crop&q=80&w=800', description: 'Zonal material distribution and finish specs.' },
+          { type: 'Tread Pattern', url: 'https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?auto=format&fit=crop&q=80&w=800', description: 'Grip geometry and compound density map.' },
+        ],
+        bom: [
+          { part: 'Vamp Panel', material: 'Premium Leather', qty: 2, cost: 4.50 },
+          { part: 'Midsole', material: 'Proprietary EVA', qty: 2, cost: 3.20 },
+          { part: 'Outsole', material: 'High-Abrasion Rubber', qty: 2, cost: 2.80 },
+          { part: 'Eyelet Stay', material: 'TPU Reinforcement', qty: 4, cost: 0.90 },
+        ],
+        specs: {
+          tolerances: '±0.5mm',
+          stitching: '12 SPI Double Needle',
+          finish: 'Matte / Low Lustre',
+          weight: '340g (Size 9)',
+        }
+      },
+      x: 0,
+      y: 0,
+      scale: 1.5
+    });
+
+    setIsGenerating(false);
+    setWorkspaceMode('studio');
+  };
+
+  const handleItemMove = async (id: Id<"canvasItems"> | string, x: number, y: number) => {
+    // Type guard: only call mutation if id is a valid Id type
+    if (typeof id === 'string' && !id.includes('__tableName')) {
+      // Skip if it's a plain string (not a Convex Id)
+      return;
+    }
+    await updateCanvasItemPosition({ id: id as Id<"canvasItems">, x, y });
   };
 
   const activeWorkshop = workshops?.find(w => w.slug === resolvedParams.workshopSlug);
@@ -75,9 +172,44 @@ export default function ProjectPage({ params }: { params: Promise<{ workshopSlug
     }
   }, [session, isPending, router]);
 
+  // Auto-send prompt from research page if available
+  useEffect(() => {
+    if (projectId && !currentPrompt && !isGenerating) {
+      const storedPrompt = sessionStorage.getItem('pendingPrompt');
+      if (storedPrompt) {
+        try {
+          const promptData = JSON.parse(storedPrompt) as { text?: string; attachments?: Array<{ id?: string; objectKey?: string; url?: string; fileName?: string; contentType?: string; size?: number; base64?: string }> };
+          const payload: PromptPayload = {
+            text: promptData.text || '',
+            attachments: promptData.attachments?.map((a) => ({
+              // id is optional in MediaAttachment, omit if not a valid Convex Id
+              ...(a.id && typeof a.id === 'object' && '__tableName' in a.id ? { id: a.id as Id<"media"> } : {}),
+              objectKey: a.objectKey || '',
+              url: a.url || '',
+              fileName: a.fileName || '',
+              contentType: a.contentType || '',
+              size: a.size || 0,
+              base64: a.base64,
+            })) || [],
+          };
+          
+          // Defer state updates to avoid cascading renders
+          setTimeout(() => {
+            setCurrentPrompt(payload);
+            setIsGenerating(true);
+          }, 0);
+          sessionStorage.removeItem('pendingPrompt');
+        } catch (err) {
+          console.error('Failed to parse stored prompt:', err);
+          sessionStorage.removeItem('pendingPrompt');
+        }
+      }
+    }
+  }, [projectId, currentPrompt, isGenerating]);
+
   if (isPending || !session) {
     return (
-      <div className="flex h-screen items-center justify-center bg-black text-white">
+      <div className="flex h-screen items-center justify-center bg-background text-foreground">
         <div className="animate-pulse font-mono text-xs tracking-[0.3em] uppercase">
           Initializing Studio...
         </div>
@@ -87,7 +219,7 @@ export default function ProjectPage({ params }: { params: Promise<{ workshopSlug
 
   if (project === undefined) {
     return (
-      <div className="flex h-screen items-center justify-center bg-black text-white">
+      <div className="flex h-screen items-center justify-center bg-background text-foreground">
         <div className="animate-pulse font-mono text-xs tracking-[0.3em] uppercase">
           Loading Project...
         </div>
@@ -97,13 +229,13 @@ export default function ProjectPage({ params }: { params: Promise<{ workshopSlug
 
   if (project === null) {
     return (
-      <div className="flex h-screen flex-col items-center justify-center bg-black text-white gap-4">
-        <div className="font-mono text-xs tracking-[0.3em] uppercase text-neutral-500">
+      <div className="flex h-screen flex-col items-center justify-center bg-background text-foreground gap-4">
+        <div className="font-mono text-xs tracking-[0.3em] uppercase text-muted-foreground">
           Project Not Found
         </div>
         <button 
           onClick={() => router.push('/studio')}
-          className="text-[10px] uppercase tracking-[0.2em] px-4 py-2 border border-white/10 rounded-full hover:bg-white hover:text-black transition-all"
+          className="text-[10px] uppercase tracking-[0.2em] px-4 py-2 border border-border rounded-full hover:bg-foreground hover:text-background transition-all"
         >
           Return to Studio
         </button>
@@ -113,31 +245,50 @@ export default function ProjectPage({ params }: { params: Promise<{ workshopSlug
 
   return (
     <SidebarProvider>
-      <div className="flex h-screen bg-neutral-950 text-white overflow-hidden font-sans w-full">
+      <div className="flex h-screen bg-background text-foreground overflow-hidden font-sans w-full">
         {/* Studio Sidebar */}
         <AppSidebar />
 
         {/* Main Studio Area */}
-        <SidebarInset className="flex-1 relative flex flex-col bg-neutral-950 border-none!">
+        <SidebarInset className="flex-1 relative flex flex-col bg-background border-none!">
           {/* Top bar info */}
-          <header className="h-14 border-b border-white/5 flex items-center justify-between px-6 bg-neutral-950/50 backdrop-blur-sm z-20">
+          <header className="h-14 border-b border-border flex items-center justify-between px-6 bg-background/50 backdrop-blur-sm z-20">
             <div className="flex items-center gap-4">
-              <span className="text-[10px] uppercase tracking-[0.2em] text-neutral-500 font-mono">Workshop</span>
+              <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground font-mono">Workshop</span>
               <span className="text-xs font-medium">{activeWorkshop?.name || 'Loading...'}</span>
-              <span className="text-neutral-700">/</span>
-              <span className="text-[10px] uppercase tracking-[0.2em] text-neutral-500 font-mono">Project</span>
-              <span className="text-xs font-medium">{project.name}</span>
+              <span className="text-muted-foreground/30">/</span>
+              <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground font-mono">Project</span>
+              {isRenaming ? (
+                <input
+                  autoFocus
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleHeaderRename();
+                    if (e.key === 'Escape') setIsRenaming(false);
+                  }}
+                  onBlur={handleHeaderRename}
+                  className="bg-transparent border-b border-primary text-xs font-medium focus:outline-none px-1 py-0.5"
+                />
+              ) : (
+                <span 
+                  className="text-xs font-medium cursor-pointer hover:text-primary transition-colors"
+                  onClick={handleStartRename}
+                >
+                  {project.name}
+                </span>
+              )}
             </div>
 
             {/* Workspace Mode Toggle */}
-            <div className="absolute left-1/2 -translate-x-1/2 flex items-center bg-neutral-900 border border-white/5 rounded-full p-1 shadow-inner">
+            <div className="absolute left-1/2 -translate-x-1/2 flex items-center bg-muted border border-border rounded-full p-1 shadow-inner">
               <button
                 onClick={() => setWorkspaceMode('research')}
                 className={cn(
                   "px-4 py-1.5 rounded-full text-[10px] uppercase font-bold tracking-[0.2em] transition-all",
                   workspaceMode === 'research' 
-                    ? "bg-white text-black shadow-lg" 
-                    : "text-neutral-500 hover:text-neutral-300"
+                    ? "bg-background text-foreground shadow-lg" 
+                    : "text-muted-foreground hover:text-foreground"
                 )}
               >
                 Research
@@ -147,8 +298,8 @@ export default function ProjectPage({ params }: { params: Promise<{ workshopSlug
                 className={cn(
                   "px-4 py-1.5 rounded-full text-[10px] uppercase font-bold tracking-[0.2em] transition-all",
                   workspaceMode === 'studio' 
-                    ? "bg-white text-black shadow-lg" 
-                    : "text-neutral-500 hover:text-neutral-300"
+                    ? "bg-background text-foreground shadow-lg" 
+                    : "text-muted-foreground hover:text-foreground"
                 )}
               >
                 Studio
@@ -160,14 +311,25 @@ export default function ProjectPage({ params }: { params: Promise<{ workshopSlug
                 "w-2 h-2 rounded-full",
                 isGenerating ? "bg-orange-500 animate-pulse" : "bg-emerald-500"
               )} />
-              <span className="text-[10px] uppercase tracking-widest text-neutral-400 font-mono">
+              <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-mono mr-2">
                 {isGenerating ? 'AI Generating...' : 'System Ready'}
               </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowAnalytics(!showAnalytics)}
+                className={cn(
+                  "h-8 w-8 transition-colors",
+                  showAnalytics ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <BarChart3 className="h-4 w-4" />
+              </Button>
             </div>
           </header>
 
           {/* 3D/2D Viewport or Research Chat */}
-          <div className="flex-1 relative bg-[radial-gradient(circle_at_center,var(--tw-gradient-stops))] from-neutral-900 to-black overflow-hidden">
+          <div className="flex-1 relative bg-background overflow-hidden">
             {workspaceMode === 'studio' ? (
               <GenerationCanvas 
                 mode={mode} 
@@ -177,17 +339,18 @@ export default function ProjectPage({ params }: { params: Promise<{ workshopSlug
               />
             ) : (
               <ResearchChat 
+                key={project?._id} // Force remount when project changes
                 onSendToCanvas={handleSendToCanvas}
+                onGenerateBlueprint={handleGenerateBlueprint}
                 pendingMessage={currentPrompt || undefined}
                 isGenerating={isGenerating}
-                onGenerationComplete={() => {
-                  setIsGenerating(false);
-                  setCurrentPrompt(null);
-                }}
+                onGenerationComplete={handleGenerationComplete}
+                onProcessingStart={() => setIsGenerating(true)}
+                onMessageConsumed={() => setCurrentPrompt(null)}
                 projectId={project?._id}
                 projectContext={{
-                  projectName: project?.name,
-                  workshopName: activeWorkshop?.name,
+                  projectName: resolvedParams.projectSlug,
+                  workshopName: resolvedParams.workshopSlug,
                   status: project?.status,
                 }}
               />
@@ -201,7 +364,6 @@ export default function ProjectPage({ params }: { params: Promise<{ workshopSlug
                   userId={session?.user?.id}
                   onGenerate={(payload) => {
                     setCurrentPrompt(payload);
-                    setIsGenerating(true);
                   }} 
                   isGenerating={isGenerating} 
                 />
@@ -211,7 +373,7 @@ export default function ProjectPage({ params }: { params: Promise<{ workshopSlug
         </SidebarInset>
 
         {/* Parameter Panel */}
-        <ParameterPanel mode={mode} projectId={project?._id} />
+        {showAnalytics && <ParameterPanel mode={mode} projectId={project?._id} />}
       </div>
     </SidebarProvider>
   );

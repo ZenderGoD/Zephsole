@@ -24,7 +24,7 @@ export function SplitFlapAudioProvider({ children }: { children: React.ReactNode
   const getAudioContext = useCallback(() => {
     if (typeof window === "undefined") return null
     if (!audioContextRef.current) {
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
+      const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
       if (AudioContextClass) {
         audioContextRef.current = new AudioContextClass()
       }

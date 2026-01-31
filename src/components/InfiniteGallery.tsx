@@ -2,7 +2,7 @@
 
 import type React from 'react';
 import { useRef, useMemo, useCallback, useState, useEffect, Suspense, Component } from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { Canvas, useFrame } from '@react-three/fiber';
 import { useTexture } from '@react-three/drei';
 import * as THREE from 'three';
 
@@ -198,12 +198,16 @@ function ImagePlane({
 
 	useEffect(() => {
 		if (material && texture) {
+			// Three.js materials are designed to be mutable - this is intentional
+			// eslint-disable-next-line react-hooks/immutability
 			material.uniforms.map.value = texture;
 		}
 	}, [material, texture]);
 
 	useEffect(() => {
 		if (material && material.uniforms) {
+			// Three.js materials are designed to be mutable - this is intentional
+			// eslint-disable-next-line react-hooks/immutability
 			material.uniforms.isHovered.value = isHovered ? 1.0 : 0.0;
 		}
 	}, [material, isHovered]);
@@ -238,7 +242,12 @@ function GalleryScene({
 }: Omit<InfiniteGalleryProps, 'className' | 'style'>) {
 	const [scrollVelocity, setScrollVelocity] = useState(0);
 	const [autoPlay, setAutoPlay] = useState(true);
-	const lastInteraction = useRef(Date.now());
+	const lastInteraction = useRef<number>(0);
+	
+	// Initialize lastInteraction outside render
+	useEffect(() => {
+		lastInteraction.current = Date.now();
+	}, []);
 
 	// Normalize images to objects
 	const normalizedImages = useMemo(
@@ -286,8 +295,8 @@ function GalleryScene({
 	const totalImages = normalizedImages.length;
 	const depthRange = DEFAULT_DEPTH_RANGE;
 
-	// Initialize plane data
-	const planesData = useRef<PlaneData[]>(
+	// Initialize plane data as state to avoid ref access during render
+	const [planesData, setPlanesData] = useState<PlaneData[]>(
 		Array.from({ length: visibleCount }, (_, i) => ({
 			index: i,
 			z: visibleCount > 0 ? ((depthRange / visibleCount) * i) % depthRange : 0,
@@ -298,16 +307,19 @@ function GalleryScene({
 	);
 
 	useEffect(() => {
-		planesData.current = Array.from({ length: visibleCount }, (_, i) => ({
-			index: i,
-			z:
-				visibleCount > 0
-					? ((depthRange / Math.max(visibleCount, 1)) * i) % depthRange
-					: 0,
-			imageIndex: totalImages > 0 ? i % totalImages : 0,
-			x: spatialPositions[i]?.x ?? 0,
-			y: spatialPositions[i]?.y ?? 0,
-		}));
+		// Defer state update to avoid cascading renders
+		setTimeout(() => {
+			setPlanesData(Array.from({ length: visibleCount }, (_, i) => ({
+				index: i,
+				z:
+					visibleCount > 0
+						? ((depthRange / Math.max(visibleCount, 1)) * i) % depthRange
+						: 0,
+				imageIndex: totalImages > 0 ? i % totalImages : 0,
+				x: spatialPositions[i]?.x ?? 0,
+				y: spatialPositions[i]?.y ?? 0,
+			})));
+		}, 0);
 	}, [depthRange, spatialPositions, totalImages, visibleCount]);
 
 	// Handle scroll input
@@ -384,7 +396,7 @@ function GalleryScene({
 		const totalRange = depthRange;
 		const halfRange = totalRange / 2;
 
-		planesData.current.forEach((plane, i) => {
+		planesData.forEach((plane, i) => {
 			let newZ = plane.z + scrollVelocity * delta * 10;
 			let wrapsForward = 0;
 			let wrapsBackward = 0;
@@ -491,7 +503,7 @@ function GalleryScene({
 
 	return (
 		<>
-			{planesData.current.map((plane, i) => {
+			{planesData.map((plane, i) => {
 				const texture = textures[plane.imageIndex];
 				const material = materials[i];
 
@@ -572,10 +584,14 @@ export default function InfiniteGallery({
 			const gl =
 				canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
 			if (!gl) {
-				setWebglSupported(false);
+				setTimeout(() => {
+					setWebglSupported(false);
+				}, 0);
 			}
-		} catch (e) {
-			setWebglSupported(false);
+		} catch {
+			setTimeout(() => {
+				setWebglSupported(false);
+			}, 0);
 		}
 	}, []);
 

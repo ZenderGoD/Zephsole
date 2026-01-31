@@ -86,7 +86,11 @@ export function ScrambleText({ text, className, delayMs = 0, duration = 0.9 }: S
       .split("")
       .map(() => GLYPHS[Math.floor(Math.random() * GLYPHS.length)])
       .join("")
-    setDisplayText(scrambledStart)
+    
+    // Defer state update to avoid cascading renders
+    setTimeout(() => {
+      setDisplayText(scrambledStart)
+    }, 0)
 
     timeoutRef.current = setTimeout(() => {
       animationRef.current = runScrambleAnimation(text, duration, setDisplayText, () => {
@@ -98,12 +102,14 @@ export function ScrambleText({ text, className, delayMs = 0, duration = 0.9 }: S
       if (timeoutRef.current) clearTimeout(timeoutRef.current)
       if (animationRef.current) animationRef.current.kill()
     }
-  }, []) // Empty deps - only run on mount
+  }, [text, duration, delayMs]) // Include dependencies
 
   // Handle text prop changes after initial animation
   useEffect(() => {
     if (hasAnimated && displayText !== text) {
-      setDisplayText(text)
+      setTimeout(() => {
+        setDisplayText(text)
+      }, 0)
     }
   }, [text, hasAnimated, displayText])
 
@@ -152,7 +158,9 @@ export function ScrambleTextOnHover({
   // Update display text if text prop changes
   useEffect(() => {
     if (!isAnimating.current) {
-      setDisplayText(text)
+      setTimeout(() => {
+        setDisplayText(text)
+      }, 0)
     }
   }, [text])
 

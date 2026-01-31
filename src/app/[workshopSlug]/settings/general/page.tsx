@@ -5,6 +5,7 @@ import { useWorkshop } from "@/hooks/use-workshop";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { H1, H2, P, Muted } from "@/components/ui/typography";
 
 export default function GeneralSettingsPage() {
   const params = useParams();
@@ -14,8 +15,8 @@ export default function GeneralSettingsPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-light tracking-tighter">Workspace Settings</h1>
-        <p className="text-sm text-neutral-500 mt-1">Configure your design studio's identity and global settings.</p>
+        <H1 className="text-2xl font-light tracking-tighter">Workspace Settings</H1>
+        <P className="text-sm text-neutral-500 mt-1">Configure your design studio&apos;s identity and global settings.</P>
       </div>
 
       <div className="space-y-6">
@@ -49,8 +50,8 @@ export default function GeneralSettingsPage() {
         </div>
 
         <div className="pt-12 border-t border-white/5">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-red-500">Danger Zone</h2>
-          <p className="text-xs text-neutral-500 mt-2">Permanently delete this workspace and all associated projects.</p>
+          <H2 className="text-sm font-bold uppercase tracking-widest text-red-500">Danger Zone</H2>
+          <P className="text-xs text-neutral-500 mt-2">Permanently delete this workspace and all associated projects.</P>
           <Button variant="outline" className="mt-4 border-red-900/50 text-red-500 hover:bg-red-950/20 hover:text-red-400 text-[10px] uppercase tracking-widest">
             Delete Workspace
           </Button>

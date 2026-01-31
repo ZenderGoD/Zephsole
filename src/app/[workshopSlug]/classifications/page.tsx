@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
 import { useParams, useRouter } from "next/navigation";
+import { Id } from "../../../../convex/_generated/dataModel";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
@@ -25,6 +26,9 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { H1, H3, P, Muted } from "@/components/ui/typography";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function ClassificationsPage() {
   const params = useParams();
@@ -46,9 +50,9 @@ export default function ClassificationsPage() {
   const [createFolderName, setCreateFolderName] = useState("");
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [renameFolderName, setRenameFolderName] = useState("");
-  const [renameFolderId, setRenameFolderId] = useState<string | null>(null);
+  const [renameFolderId, setRenameFolderId] = useState<Id<"classifications"> | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deleteFolderId, setDeleteFolderId] = useState<string | null>(null);
+  const [deleteFolderId, setDeleteFolderId] = useState<Id<"classifications"> | null>(null);
   const [deleteFolderName, setDeleteFolderName] = useState("");
 
   useEffect(() => {
@@ -86,7 +90,7 @@ export default function ClassificationsPage() {
     }
   };
 
-  const handleRenameClick = (id: string, currentName: string) => {
+  const handleRenameClick = (id: Id<"classifications">, currentName: string) => {
     setRenameFolderId(id);
     setRenameFolderName(currentName);
     setRenameDialogOpen(true);
@@ -102,7 +106,7 @@ export default function ClassificationsPage() {
     setRenameFolderName("");
   };
 
-  const handleDeleteClick = (id: string, name: string) => {
+  const handleDeleteClick = (id: Id<"classifications">, name: string) => {
     setDeleteFolderId(id);
     setDeleteFolderName(name);
     setDeleteDialogOpen(true);
@@ -132,12 +136,12 @@ export default function ClassificationsPage() {
             </div>
           </header>
 
-          <div className="flex-1 overflow-y-auto p-8" data-lenis-prevent>
-            <div className="max-w-6xl mx-auto">
+          <ScrollArea className="flex-1" data-lenis-prevent>
+            <div className="p-8 max-w-6xl mx-auto">
               <div className="flex items-center justify-between mb-8">
                 <div>
-                  <h1 className="text-2xl font-bold text-white mb-2">Classifications</h1>
-                  <p className="text-neutral-500 text-sm">Organize and manage your projects by classification</p>
+                  <H1 className="text-white mb-2">Classifications</H1>
+                  <P className="text-neutral-500 text-sm">Organize and manage your projects by classification</P>
                 </div>
                 <button 
                   type="button"
@@ -156,16 +160,16 @@ export default function ClassificationsPage() {
               {classifications === undefined ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {[1, 2, 3].map((i) => (
-                    <div key={i} className="h-32 bg-white/5 animate-pulse rounded-xl border border-white/10" />
+                    <Skeleton key={i} className="h-32 rounded-xl border border-white/10" />
                   ))}
                 </div>
               ) : classifications.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed border-white/5 rounded-2xl bg-white/5">
                   <Folder className="size-12 text-neutral-700 mb-4" />
-                  <h3 className="text-lg font-medium text-neutral-400">No folders created yet</h3>
-                  <p className="text-neutral-600 text-sm mb-6 text-center max-w-xs">
+                  <H3 className="text-lg font-medium text-neutral-400">No folders created yet</H3>
+                  <P className="text-neutral-600 text-sm mb-6 text-center max-w-xs">
                     Create your first classification folder to start organizing your creative work.
-                  </p>
+                  </P>
                   <button 
                     type="button"
                     onClick={handleCreateClick}
@@ -221,7 +225,7 @@ export default function ClassificationsPage() {
                         </div>
                         
                         <div>
-                          <h3 className="text-white font-semibold text-lg mb-1">{folder.name}</h3>
+                          <H3 className="text-white font-semibold text-lg mb-1">{folder.name}</H3>
                           <div className="flex items-center gap-2">
                             <div className="flex -space-x-2">
                               {folderProjects.slice(0, 3).map((p, i) => (
@@ -250,7 +254,7 @@ export default function ClassificationsPage() {
                 </div>
               )}
             </div>
-          </div>
+          </ScrollArea>
         </SidebarInset>
       </div>
 
@@ -344,7 +348,7 @@ export default function ClassificationsPage() {
           <DialogHeader>
             <DialogTitle>Delete Folder</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete "{deleteFolderName}"? Projects inside will be unclassified.
+              Are you sure you want to delete &quot;{deleteFolderName}&quot;? Projects inside will be unclassified.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

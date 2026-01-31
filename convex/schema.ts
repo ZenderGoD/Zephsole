@@ -12,9 +12,20 @@ export default defineSchema({
     status: v.string(), // "draft", "generating", "complete"
     lastUpdated: v.number(),
     isPinned: v.optional(v.boolean()),
+    imageUrl: v.optional(v.string()),
+    description: v.optional(v.string()),
     classificationId: v.optional(v.id("classifications")),
     mode: v.optional(v.union(v.literal("research"), v.literal("studio"))),
     unitSystem: v.optional(v.union(v.literal("mm"), v.literal("us"), v.literal("eu"), v.literal("cm"))),
+    messageQueue: v.optional(v.array(v.object({
+      id: v.string(),
+      createdAt: v.number(),
+      createdBy: v.string(),
+      prompt: v.string(),
+      attachments: v.optional(v.array(v.any())),
+    }))),
+    threadStatus: v.optional(v.union(v.literal("idle"), v.literal("pending"), v.literal("generating"), v.literal("error"))),
+    errorMessage: v.optional(v.string()),
   }).index("by_workshop", ["workshopId"])
     .index("by_slug", ["slug"])
     .index("by_workshop_pinned", ["workshopId", "isPinned"]),
@@ -84,6 +95,7 @@ export default defineSchema({
     content: v.string(),
     type: v.optional(v.string()), // "text", "card"
     cardData: v.optional(v.any()),
+    messageId: v.optional(v.string()), // Store useChat message ID for matching
     attachments: v.optional(v.array(v.object({
       mediaId: v.optional(v.id("media")),
       url: v.string(),
@@ -201,4 +213,59 @@ export default defineSchema({
     uploadedBy: v.optional(v.string()),
     createdAt: v.number(),
   }).index("by_project", ["projectId"]),
+
+  imageGenerations: defineTable({
+    toolCallId: v.string(), // Unique ID from tool invocation
+    projectId: v.optional(v.id("projects")),
+    userId: v.optional(v.string()),
+    workflowId: v.optional(v.string()), // Workflow ID for tracking
+    status: v.union(
+      v.literal("generating"),
+      v.literal("completed"),
+      v.literal("error")
+    ),
+    prompt: v.optional(v.string()),
+    aspectRatio: v.optional(v.string()),
+    url: v.optional(v.string()), // Generated image URL
+    storageKey: v.optional(v.string()),
+    model: v.optional(v.string()),
+    error: v.optional(v.string()),
+    createdAt: v.number(),
+    completedAt: v.optional(v.number()),
+    source: v.optional(v.union(v.literal("research"), v.literal("studio"))),
+  }).index("by_toolCallId", ["toolCallId"])
+    .index("by_project", ["projectId"])
+    .index("by_workflowId", ["workflowId"]),
+
+  creditGrants: defineTable({
+    workshopId: v.id("workshops"),
+    amount: v.number(),
+    remaining: v.number(),
+    startsAt: v.number(),
+    expiresAt: v.number(),
+    source: v.string(), // "purchase", "referral", "bonus"
+    refId: v.optional(v.string()), // External ID (e.g. Stripe session ID)
+    metadata: v.optional(v.any()),
+  }).index("by_workshop_expires", ["workshopId", "expiresAt"])
+    .index("by_source_ref", ["source", "refId"]),
+
+  creditRedemptions: defineTable({
+    workshopId: v.id("workshops"),
+    amount: v.number(),
+    usageAt: v.number(),
+    createdAt: v.number(),
+    projectId: v.optional(v.id("projects")),
+    userId: v.optional(v.string()),
+    assetType: v.optional(v.union(v.literal("image"), v.literal("video"), v.literal("3d"), v.literal("research"))),
+    description: v.optional(v.string()),
+    idempotencyKey: v.optional(v.string()),
+  }).index("by_workshop_usage", ["workshopId", "usageAt"])
+    .index("by_workshop_idem", ["workshopId", "idempotencyKey"]),
+
+  creditAllocations: defineTable({
+    redemptionId: v.id("creditRedemptions"),
+    grantId: v.id("creditGrants"),
+    amount: v.number(),
+  }).index("by_redemption", ["redemptionId"])
+    .index("by_grant", ["grantId"]),
 });
