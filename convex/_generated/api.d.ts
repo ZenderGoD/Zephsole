@@ -10,6 +10,7 @@
 
 import type * as auth from "../auth.js";
 import type * as authInternal from "../authInternal.js";
+import type * as authOptions from "../authOptions.js";
 import type * as authSchema from "../authSchema.js";
 import type * as backfill from "../backfill.js";
 import type * as credits from "../credits.js";
@@ -46,6 +47,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   authInternal: typeof authInternal;
+  authOptions: typeof authOptions;
   authSchema: typeof authSchema;
   backfill: typeof backfill;
   credits: typeof credits;

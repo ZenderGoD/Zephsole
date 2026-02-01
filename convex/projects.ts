@@ -5,14 +5,14 @@ import { authComponent } from "./auth";
 export const getProjects = query({
   args: { workshopId: v.id("workshops") },
   handler: async (ctx, args) => {
-    const user = await authComponent.safeGetAuthUser(ctx as any);
+    const user = await authComponent.safeGetAuthUser(ctx);
     if (!user) return [];
 
     // Check if user is a member of this workshop
     const membership = await ctx.db
       .query("workshopMembers")
       .withIndex("by_workshop_user", (q) => 
-        q.eq("workshopId", args.workshopId).eq("userId", user.id)
+        q.eq("workshopId", args.workshopId).eq("userId", user._id)
       )
       .first();
 
@@ -181,7 +181,7 @@ export const convertToProduct = mutation({
 export const getProject = query({
   args: { id: v.id("projects") },
   handler: async (ctx, args) => {
-    const user = await authComponent.safeGetAuthUser(ctx as any);
+    const user = await authComponent.safeGetAuthUser(ctx);
     if (!user) return null;
 
     const project = await ctx.db.get(args.id);
@@ -191,7 +191,7 @@ export const getProject = query({
     const membership = await ctx.db
       .query("workshopMembers")
       .withIndex("by_workshop_user", (q) => 
-        q.eq("workshopId", project.workshopId).eq("userId", user.id)
+        q.eq("workshopId", project.workshopId).eq("userId", user._id)
       )
       .first();
 
@@ -204,7 +204,7 @@ export const getProject = query({
 export const getProjectBySlug = query({
   args: { workshopSlug: v.string(), projectSlug: v.string() },
   handler: async (ctx, args) => {
-    const user = await authComponent.safeGetAuthUser(ctx as any);
+    const user = await authComponent.safeGetAuthUser(ctx);
     if (!user) return null;
 
     const workshop = await ctx.db
@@ -218,7 +218,7 @@ export const getProjectBySlug = query({
     const membership = await ctx.db
       .query("workshopMembers")
       .withIndex("by_workshop_user", (q) => 
-        q.eq("workshopId", workshop._id).eq("userId", user.id)
+        q.eq("workshopId", workshop._id).eq("userId", user._id)
       )
       .first();
 
@@ -244,14 +244,14 @@ export const getProjectBySlug = query({
 export const getClassifications = query({
   args: { workshopId: v.id("workshops") },
   handler: async (ctx, args) => {
-    const user = await authComponent.safeGetAuthUser(ctx as any);
+    const user = await authComponent.safeGetAuthUser(ctx);
     if (!user) return [];
 
     // Check membership
     const membership = await ctx.db
       .query("workshopMembers")
       .withIndex("by_workshop_user", (q) => 
-        q.eq("workshopId", args.workshopId).eq("userId", user.id)
+        q.eq("workshopId", args.workshopId).eq("userId", user._id)
       )
       .first();
 

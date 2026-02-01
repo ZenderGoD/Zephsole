@@ -1,7 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
-
 import { authComponent } from "./auth";
 
 const FREE_CREDITS = 5.00;
@@ -9,8 +8,8 @@ const FREE_CREDITS = 5.00;
 export const getWorkshops = query({
   args: { userId: v.string() },
   handler: async (ctx, args) => {
-    const user = await authComponent.safeGetAuthUser(ctx as any);
-    if (!user || user.id !== args.userId) return [];
+    const user = await authComponent.safeGetAuthUser(ctx);
+    if (!user || user._id !== args.userId) return [];
 
     const memberships = await ctx.db
       .query("workshopMembers")
@@ -200,14 +199,14 @@ export const inviteMember = mutation({
 export const getMembers = query({
   args: { workshopId: v.id("workshops") },
   handler: async (ctx, args) => {
-    const user = await authComponent.safeGetAuthUser(ctx as any);
+    const user = await authComponent.safeGetAuthUser(ctx);
     if (!user) return [];
 
     // Check membership of requester
     const requesterMembership = await ctx.db
       .query("workshopMembers")
       .withIndex("by_workshop_user", (q) => 
-        q.eq("workshopId", args.workshopId).eq("userId", user.id)
+        q.eq("workshopId", args.workshopId).eq("userId", user._id)
       )
       .first();
 
@@ -220,7 +219,10 @@ export const getMembers = query({
 
     const members = [];
     for (const membership of memberships) {
-      const userDoc = await ctx.db.get(membership.userId as any);
+      const userDoc = await ctx.db
+        .query("user")
+        .withIndex("userId", (q) => q.eq("userId", membership.userId))
+        .first();
       if (userDoc) {
         members.push({
           ...userDoc,

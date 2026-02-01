@@ -1,11 +1,12 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { authComponent } from "./auth";
+import { GenericQueryCtx, GenericDataModel } from "convex/server";
 
 export const getMessages = query({
   args: { projectId: v.id("projects") },
   handler: async (ctx, args) => {
-    const user = await authComponent.safeGetAuthUser(ctx as any);
+    const user = await authComponent.safeGetAuthUser(ctx);
     if (!user) return [];
 
     const project = await ctx.db.get(args.projectId);
@@ -15,7 +16,7 @@ export const getMessages = query({
     const membership = await ctx.db
       .query("workshopMembers")
       .withIndex("by_workshop_user", (q) => 
-        q.eq("workshopId", project.workshopId).eq("userId", user.id)
+        q.eq("workshopId", project.workshopId).eq("userId", user._id)
       )
       .first();
 

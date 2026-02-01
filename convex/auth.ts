@@ -1,33 +1,25 @@
 import { betterAuth } from "better-auth";
-import { createClient, convexAdapter } from "@convex-dev/better-auth";
+import { createClient, convexAdapter, GenericCtx } from "@convex-dev/better-auth";
 import { admin } from "better-auth/plugins";
-import { components, api } from "./_generated/api";
-import { QueryCtx } from "./_generated/server";
+import { components, api, internal } from "./_generated/api";
+import { defineSchema, GenericDataModel } from "convex/server";
 import { authTables } from "./authSchema";
+import { getAuthOptions } from "./authOptions";
 
-export const authComponent = createClient(components.betterAuth, {
+import { DataModel } from "./_generated/dataModel";
+
+const schema = defineSchema(authTables);
+type Schema = typeof schema;
+
+export const authComponent = createClient<DataModel, Schema>(components.betterAuth, {
   local: {
-    schema: authTables as any,
+    schema,
   },
 });
 
-export const createAuth = (ctx: QueryCtx) => {
+export const createAuth = (ctx: GenericCtx<DataModel>) => {
   return betterAuth({
-    database: convexAdapter(ctx as any, { adapter: (api as any).authInternal } as any),
-    baseURL: process.env.BETTER_AUTH_URL,
-    emailAndPassword: {
-      enabled: true,
-    },
-    socialProviders: {
-      google: {
-        clientId: process.env.GOOGLE_CLIENT_ID as string,
-        clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
-      },
-    },
-    plugins: [
-      admin({
-        defaultRole: "user",
-      }),
-    ],
+    ...getAuthOptions(),
+    database: authComponent.adapter(ctx),
   });
 };

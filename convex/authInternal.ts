@@ -1,15 +1,19 @@
 import { createApi } from "@convex-dev/better-auth";
 import { authTables } from "./authSchema";
 import { defineSchema } from "convex/server";
+import { internalMutation, internalQuery } from "./_generated/server";
+import { getAuthOptions } from "./authOptions";
 
 const schema = defineSchema(authTables);
 
-const internalApi = createApi(schema, () => ({}) as any);
+const internalApi = createApi(schema, () => getAuthOptions());
 
-export const create = internalApi.create;
-export const findOne = internalApi.findOne;
-export const findMany = internalApi.findMany;
-export const updateOne = internalApi.updateOne;
-export const updateMany = internalApi.updateMany;
-export const deleteOne = internalApi.deleteOne;
-export const deleteMany = internalApi.deleteMany;
+export const {
+  create,
+  findOne,
+  findMany,
+  updateOne,
+  updateMany,
+  deleteOne,
+  deleteMany,
+} = internalApi;
