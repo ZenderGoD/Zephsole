@@ -1,7 +1,11 @@
 import InfiniteGallery from '@/components/InfiniteGallery';
 import Link from 'next/link';
+import { useQuery } from 'convex/react';
+import { api } from '../../convex/_generated/api';
 
 export function GalleryLanding() {
+	const landingAssets = useQuery(api.siteAssets.listAssets, { type: 'landing' });
+	
 	const sampleImages = [
 		{ src: 'https://images.unsplash.com/photo-1549298916-b41d501d3772?auto=format&fit=crop&q=80&w=800', alt: 'Footwear Design' },
 		{ src: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&q=80&w=800', alt: 'Performance Sole' },
@@ -13,10 +17,14 @@ export function GalleryLanding() {
 		{ src: 'https://images.unsplash.com/photo-1560769629-975ec94e6a86?auto=format&fit=crop&q=80&w=800', alt: 'Sole Prototype' },
 	];
 
+	const displayImages = landingAssets && landingAssets.length > 0 
+		? landingAssets.map(asset => ({ src: asset.url, alt: asset.fileName }))
+		: sampleImages;
+
 	return (
 		<div className="min-h-screen bg-white">
 			<InfiniteGallery
-				images={sampleImages}
+				images={displayImages}
 				speed={1.2}
 				zSpacing={3}
 				visibleCount={12}

@@ -1,69 +1,26 @@
 'use client';
 
-import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
 import { GalleryLanding } from '@/components/GalleryLanding';
 import { SignalLanding } from '@/components/SignalLanding';
-import { cn } from '@/lib/utils';
-import Link from 'next/link';
-import { authClient } from '@/lib/auth-client';
 
-export default function Page() {
-  const [activeTab, setActiveTab] = useState<'gallery' | 'signal'>('gallery');
-  const { data: session } = authClient.useSession();
+function PageContent() {
+  const searchParams = useSearchParams();
+  const activeTab = searchParams.get('tab') || 'gallery';
 
   return (
     <div className="relative">
-      {/* Auth Link */}
-      <div className="fixed top-6 right-6 z-[100] flex gap-3">
-        {session ? (
-          <Link 
-            href="/studio"
-            className="bg-primary text-primary-foreground px-4 py-1.5 rounded-full text-xs font-medium hover:bg-primary/90 transition-colors"
-          >
-            Go to Studio
-          </Link>
-        ) : (
-          <>
-            <Link 
-              href="/login"
-              className="text-muted-foreground hover:text-foreground px-4 py-1.5 rounded-full text-xs font-medium transition-colors"
-            >
-              Sign In
-            </Link>
-            <Link 
-              href="/register"
-              className="bg-primary text-primary-foreground px-4 py-1.5 rounded-full text-xs font-medium hover:bg-primary/90 transition-colors"
-            >
-              Sign Up
-            </Link>
-          </>
-        )}
-      </div>
-
-      {/* Toggle */}
-      <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] flex items-center bg-background/50 backdrop-blur-md p-1 rounded-full border border-border">
-        <button
-          onClick={() => setActiveTab('gallery')}
-          className={cn(
-            "px-4 py-1.5 rounded-full text-xs font-medium transition-all duration-300",
-            activeTab === 'gallery' ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-          )}
-        >
-          Gallery
-        </button>
-        <button
-          onClick={() => setActiveTab('signal')}
-          className={cn(
-            "px-4 py-1.5 rounded-full text-xs font-medium transition-all duration-300",
-            activeTab === 'signal' ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-          )}
-        >
-          Signal
-        </button>
-      </div>
-
       {/* Render active landing page */}
       {activeTab === 'gallery' ? <GalleryLanding /> : <SignalLanding />}
     </div>
+  );
+}
+
+export default function Page() {
+  return (
+    <Suspense fallback={null}>
+      <PageContent />
+    </Suspense>
   );
 }

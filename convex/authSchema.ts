@@ -17,6 +17,8 @@ export const authTables = {
         phoneNumberVerified: v.optional(v.union(v.null(), v.boolean())),
         userId: v.optional(v.union(v.null(), v.string())),
         referralCode: v.optional(v.string()),
+        role: v.optional(v.string()),
+        banned: v.optional(v.boolean()),
     })
         .index("email", ["email"])
         .index("email_name", ["email", "name"])

@@ -49,6 +49,15 @@ export function PrinciplesSection() {
       description: "Unleash AI to generate footwear aesthetics that were previously impossible to calculate.",
       align: "right",
     },
+    {
+      number: "05",
+      titleParts: [
+        { text: "VISUAL ", highlight: false },
+        { text: "MARKETING", highlight: true },
+      ],
+      description: "Cinematic 3D renders and video generation to showcase your footwear to the world with absolute fidelity.",
+      align: "left",
+    },
   ]
 
   useEffect(() => {

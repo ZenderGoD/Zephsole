@@ -38,6 +38,9 @@ export const metadata: Metadata = {
   generator: "v0.app",
 }
 
+import { Suspense } from "react"
+import { Navigation } from "@/components/navigation"
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -56,6 +59,9 @@ export default function RootLayout({
         >
           <ConvexClientProvider>
             <div className="noise-overlay" aria-hidden="true" />
+            <Suspense fallback={null}>
+              <Navigation />
+            </Suspense>
             <SmoothScroll>{children}</SmoothScroll>
             <Analytics />
           </ConvexClientProvider>

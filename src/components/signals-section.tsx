@@ -9,24 +9,29 @@ gsap.registerPlugin(ScrollTrigger)
 
 const signals = [
   {
+    date: "2026.02.01",
+    title: "MotionGen",
+    note: "AI-powered video generation for dynamic product showcases and motion marketing.",
+  },
+  {
     date: "2026.01.27",
     title: "SoleEngine V2",
     note: "Enhanced geometry generation for high-performance athletic soles.",
   },
   {
     date: "2026.01.20",
-    title: "PatternAI",
-    note: "Automated panel layering and pattern making for complex upper designs.",
+    title: "StudioRender V1",
+    note: "Advanced 3D footwear visualization with real-time lighting and texture mapping.",
   },
   {
     date: "2026.01.12",
-    title: "Costing Matrix",
-    note: "Real-time material costing and manufacturing time prediction models.",
+    title: "MarketIntelligence",
+    note: "Data-driven marketing strategies and trend forecasting specifically for footwear.",
   },
   {
     date: "2026.01.05",
-    title: "LastMaster",
-    note: "Precision shoe last generation based on global ergonomic datasets.",
+    title: "PatternAI",
+    note: "Automated panel layering and pattern making for complex upper designs.",
   },
   {
     date: "2025.12.20",

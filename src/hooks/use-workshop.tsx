@@ -23,6 +23,14 @@ export function WorkshopProvider({ children }: { children: React.ReactNode }) {
   const [activeWorkshopId, setActiveWorkshopId] = useState<Id<"workshops"> | null>(null);
   const [activeWorkshopSlug, setActiveWorkshopSlug] = useState<string | null>(null);
   
+  // Reset active workshop when session changes
+  useEffect(() => {
+    if (session?.user.id) {
+      setActiveWorkshopId(null);
+      setActiveWorkshopSlug(null);
+    }
+  }, [session?.user.id]);
+  
   const ensurePersonalWorkshop = useMutation(api.workshops.ensurePersonalWorkshop);
   const registerReferral = useMutation(api.referrals.registerReferral);
   const workshops = useQuery(api.workshops.getWorkshops, session?.user.id ? { userId: session.user.id } : "skip");

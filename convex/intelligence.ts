@@ -1,9 +1,26 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { authComponent } from "./auth";
 
 export const getMessages = query({
   args: { projectId: v.id("projects") },
   handler: async (ctx, args) => {
+    const user = await authComponent.safeGetAuthUser(ctx as any);
+    if (!user) return [];
+
+    const project = await ctx.db.get(args.projectId);
+    if (!project) return [];
+
+    // Check if user is a member of the workshop this project belongs to
+    const membership = await ctx.db
+      .query("workshopMembers")
+      .withIndex("by_workshop_user", (q) => 
+        q.eq("workshopId", project.workshopId).eq("userId", user.id)
+      )
+      .first();
+
+    if (!membership) return [];
+
     return await ctx.db
       .query("intelligenceThreads")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))

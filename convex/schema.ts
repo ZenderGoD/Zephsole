@@ -268,4 +268,15 @@ export default defineSchema({
     amount: v.number(),
   }).index("by_redemption", ["redemptionId"])
     .index("by_grant", ["grantId"]),
+
+  siteAssets: defineTable({
+    type: v.union(v.literal("landing"), v.literal("studio"), v.literal("showcase")),
+    url: v.string(),
+    key: v.string(),
+    fileName: v.string(),
+    contentType: v.string(),
+    size: v.optional(v.number()),
+    order: v.optional(v.number()),
+    createdAt: v.number(),
+  }).index("by_type", ["type"]),
 });
