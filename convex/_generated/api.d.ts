@@ -21,6 +21,7 @@ import type * as imageGenerations from "../imageGenerations.js";
 import type * as imageWorkflow from "../imageWorkflow.js";
 import type * as inspect from "../inspect.js";
 import type * as intelligence from "../intelligence.js";
+import type * as internal_authInternal from "../internal/authInternal.js";
 import type * as llm from "../llm.js";
 import type * as local from "../local.js";
 import type * as materials from "../materials.js";
@@ -58,6 +59,7 @@ declare const fullApi: ApiFromModules<{
   imageWorkflow: typeof imageWorkflow;
   inspect: typeof inspect;
   intelligence: typeof intelligence;
+  "internal/authInternal": typeof internal_authInternal;
   llm: typeof llm;
   local: typeof local;
   materials: typeof materials;

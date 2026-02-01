@@ -75,7 +75,6 @@ export function GenerationCanvas({ mode, isGenerating, items = [], onItemMove }:
             "relative w-[800px] aspect-video border border-border bg-muted/30 rounded-2xl flex items-center justify-center transition-all duration-1000",
             isGenerating ? "scale-[1.02] border-primary/20" : "scale-100 shadow-2xl"
           )}>
-            {/* ... existing content ... */}
             <div className="flex flex-col items-center gap-6">
               <div className="text-[10px] uppercase tracking-[0.5em] text-muted-foreground font-mono text-center">
                 {mode} Intelligence Stage
@@ -116,12 +115,9 @@ export function GenerationCanvas({ mode, isGenerating, items = [], onItemMove }:
               drag
               dragMomentum={false}
               onDragEnd={(e, info) => {
-                if (onItemMove) {
-                  // The info.point is relative to the viewport, we need relative to the container
-                  // For simplicity, we can just track the delta if we had the initial position
-                  // But motion drag handled the visual movement. 
-                  // Let's just pass the current x/y which motion tracks.
-                  onItemMove(item._id || item.id, item.x + info.offset.x, item.y + info.offset.y);
+                const itemId = item._id || item.id;
+                if (onItemMove && itemId) {
+                  onItemMove(itemId, item.x + info.offset.x, item.y + info.offset.y);
                 }
               }}
               initial={{ x: item.x, y: item.y, opacity: 0, scale: 0.8 }}
@@ -132,26 +128,26 @@ export function GenerationCanvas({ mode, isGenerating, items = [], onItemMove }:
               )}
             >
               {item.type === 'technical-blueprint' ? (
-                <TechnicalBlueprint data={item.data} />
+                <TechnicalBlueprint data={item.data as any} />
               ) : (
                 <>
                   <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-3 font-mono flex items-center justify-between">
                     <span>{item.type.replace('-', ' ')}</span>
-                    {(item.data?.source === 'research' || (item.data?.data as any)?.source === 'research') && (
+                    {((item.data as any)?.source === 'research' || ((item.data as any)?.data as any)?.source === 'research') && (
                       <span className="bg-emerald-500/10 text-emerald-500 px-1.5 py-0.5 rounded text-[8px] border border-emerald-500/20">
                         RESEARCH
                       </span>
                     )}
                   </div>
-                  {item.type === 'image' && item.data?.imageUrl ? (
+                  {item.type === 'image' && (item.data as any)?.imageUrl ? (
                     <div className="space-y-2">
                       <img 
-                        src={item.data.imageUrl} 
-                        alt={item.data?.title || 'Canvas upload'} 
+                        src={(item.data as any).imageUrl} 
+                        alt={(item.data as any)?.title || 'Canvas upload'} 
                         className="w-full h-40 object-cover rounded-lg border border-border"
                       />
                       <div className="text-xs text-foreground leading-relaxed">
-                        {item.data?.title || item.data?.content || 'Image upload'}
+                        {(item.data as any)?.title || (item.data as any)?.content || 'Image upload'}
                       </div>
                     </div>
                   ) : item.type === 'sole-spec' ? (
@@ -162,35 +158,35 @@ export function GenerationCanvas({ mode, isGenerating, items = [], onItemMove }:
                       </div>
                       <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                         <div className="space-y-0.5">
-                          <div className="text-[8px] uppercase text-muted-foreground">Midsole</div>
-                          <div className="text-[10px] text-foreground font-medium truncate">{item.data?.data?.midsoleMaterial}</div>
+                          <div className="text-[8px] uppercase text-neutral-500 font-mono">Midsole</div>
+                          <div className="text-[10px] text-foreground font-medium truncate">{(item.data as any)?.data?.midsoleMaterial}</div>
                         </div>
                         <div className="space-y-0.5">
-                          <div className="text-[8px] uppercase text-muted-foreground">Outsole</div>
-                          <div className="text-[10px] text-foreground font-medium truncate">{item.data?.data?.outsoleMaterial}</div>
+                          <div className="text-[8px] uppercase text-neutral-500 font-mono">Outsole</div>
+                          <div className="text-[10px] text-foreground font-medium truncate">{(item.data as any)?.data?.outsoleMaterial}</div>
                         </div>
                         <div className="space-y-0.5">
-                          <div className="text-[8px] uppercase text-muted-foreground">Stack/Drop</div>
-                          <div className="text-[10px] text-foreground font-medium">{item.data?.data?.stackHeightHeel}/{item.data?.data?.stackHeightForefoot} | {item.data?.data?.drop}mm</div>
+                          <div className="text-[8px] uppercase text-neutral-500 font-mono">Stack/Drop</div>
+                          <div className="text-[10px] text-foreground font-medium">{(item.data as any)?.data?.stackHeightHeel}/{(item.data as any)?.data?.stackHeightForefoot} | {(item.data as any)?.data?.drop}mm</div>
                         </div>
                         <div className="space-y-0.5">
-                          <div className="text-[8px] uppercase text-muted-foreground">Plate</div>
-                          <div className="text-[10px] text-foreground font-medium">{item.data?.data?.plateType}</div>
+                          <div className="text-[8px] uppercase text-neutral-500 font-mono">Plate</div>
+                          <div className="text-[10px] text-foreground font-medium">{(item.data as any)?.data?.plateType}</div>
                         </div>
                       </div>
                       <div className="pt-2 border-t border-border flex justify-between items-center">
-                        <span className="text-[9px] font-bold text-emerald-500">${item.data?.data?.costEst}</span>
-                        <span className="text-[9px] text-muted-foreground">{item.data?.data?.weightEst}g</span>
+                        <span className="text-[9px] font-bold text-emerald-500">${(item.data as any)?.data?.costEst}</span>
+                        <span className="text-[9px] text-muted-foreground">{(item.data as any)?.data?.weightEst}g</span>
                       </div>
                     </div>
                   ) : (
                     <div className="text-xs text-foreground leading-relaxed">
-                      {item.data?.content || 'No intelligence data provided.'}
+                      {(item.data as any)?.content || 'No intelligence data provided.'}
                     </div>
                   )}
                   <div className="mt-4 pt-4 border-t border-border flex items-center justify-between">
                     <div className="flex gap-1">
-                      {(item.data?.source === 'research' || (item.data?.data as any)?.source === 'research') ? (
+                      {((item.data as any)?.source === 'research' || ((item.data as any)?.data as any)?.source === 'research') ? (
                         <button 
                           onClick={() => {
                             window.dispatchEvent(new CustomEvent('switch-workspace-mode', { detail: 'research' }));

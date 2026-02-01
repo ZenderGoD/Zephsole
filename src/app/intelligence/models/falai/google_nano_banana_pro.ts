@@ -14,8 +14,9 @@ const FAL_T2I_MODEL = 'fal-ai/nano-banana-pro';
 const FAL_EDIT_MODEL = 'fal-ai/nano-banana-pro/edit';
 
 async function buildGoogleNanoBananaProInput(
-  req: StandardImageRequest & { width: number; height: number; aspectRatio: string }
+  rawReq: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
+  const req = rawReq as any as StandardImageRequest & { width: number; height: number; aspectRatio: string };
   const hasReferences = req.references && req.references.length > 0;
   
   // Map aspect ratio - nano-banana-pro accepts: auto, 21:9, 16:9, 3:2, 4:3, 5:4, 1:1, 4:5, 3:4, 2:3, 9:16
@@ -65,10 +66,7 @@ async function buildGoogleNanoBananaProInput(
 
 async function runGoogleNanoBananaPro(
   input: Record<string, unknown>,
-  getDbIndex?: () => Promise<number>,
-  getKeyLoads?: () => Promise<Record<string, { activeOperations: number; capacity: number }>>,
-  incrementKeyLoad?: (keyName: string, capacity: number) => Promise<number>,
-  decrementKeyLoad?: (keyName: string) => Promise<number>
+  ...args: any[]
 ): Promise<{ url: string; requestId?: string }> {
   // Determine which model to use based on whether image_urls is present
   const hasImageUrls = Array.isArray(input.image_urls) && input.image_urls.length > 0;
@@ -76,7 +74,7 @@ async function runGoogleNanoBananaPro(
 
   console.log(`[Google Nano Banana Pro] Using ${hasImageUrls ? 'edit' : 'text-to-image'} model: ${modelSpecifier}`);
 
-  const result = await runFalModel(modelSpecifier, input, getDbIndex, getKeyLoads, incrementKeyLoad, decrementKeyLoad);
+  const result = await runFalModel(modelSpecifier, input);
   return result;
 }
 

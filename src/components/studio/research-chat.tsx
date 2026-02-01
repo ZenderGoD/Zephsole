@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useMemo, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
+import type { UIMessage, ChatStatus, TextUIPart, FileUIPart } from 'ai';
+import { isToolUIPart, getToolName } from 'ai';
 import { useQuery, useMutation, useAction } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { Id } from '../../../convex/_generated/dataModel';
@@ -9,7 +11,7 @@ import { cn } from '@/lib/utils';
 import { CREDIT_COSTS } from '@/lib/constants';
 import { useRouter } from 'next/navigation';
 import { User, Bot, Sparkles, Image, Activity, Ruler, Layers, CreditCard, History, Maximize2, Check } from 'lucide-react';
-import { PromptPayload, SendToCanvasArgs, RenameProjectArgs, UpdateDesignContextArgs, UpdateBOMArgs, UpdateProductBaselinesArgs, RequestTechnicalBlueprintArgs, AnalyzeFootwearImageArgs, GenerateSoleSpecArgs, GenerateImageArgs, GenerateImageResult, MessageAttachment, PersistedMessage, MessageQueueItem } from '@/lib/types';
+import { PromptPayload, SendToCanvasArgs, RenameProjectArgs, UpdateDesignContextArgs, UpdateBOMArgs, UpdateProductBaselinesArgs, RequestTechnicalBlueprintArgs, AnalyzeFootwearImageArgs, GenerateSoleSpecArgs, GenerateImageArgs, GenerateImageResult, GenerateImageWorkflowResult, MessageAttachment, PersistedMessage, MessageQueueItem } from '@/lib/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -196,6 +198,7 @@ function ImageGenerationResult({ toolCallId, prompt, onSendToCanvas }: ImageGene
 
 export function ResearchChat({ 
   onSendToCanvas, 
+  onGenerateBlueprint,
   pendingMessage, 
   isGenerating, 
   onGenerationComplete, 
@@ -277,7 +280,7 @@ export function ResearchChat({
       ];
     }
 
-    const uniqueMessages: any[] = [];
+    const uniqueMessages: UIMessage[] = [];
     const seenIds = new Set<string>();
     
     persistedMessages.forEach((msg: PersistedMessage) => {
@@ -339,21 +342,22 @@ export function ResearchChat({
         projectSlug: projectContext?.projectName || '',
       } 
     },
-    onToolCall: async ({ toolCall }) => {
+    onToolCall: async (options) => {
+      const toolCall = options.toolCall as { toolName: string; toolCallId: string; args?: unknown; result?: unknown };
       if (toolCall.toolName === 'sendToCanvas') {
-        const args = (toolCall.args || {}) as SendToCanvasArgs;
+        const args = (toolCall.args ?? {}) as unknown as SendToCanvasArgs;
         onSendToCanvas?.({
           title: args.title,
           content: args.content,
           type: args.type,
           agent: args.agent,
         });
-        return { success: true };
+        return void 0;
       }
       if (toolCall.toolName === 'analyzeFootwearImage') {
         // The actual analysis happens via vision - this tool just signals the intent
         // The model will analyze images in the conversation and return findings
-        const args = (toolCall.args || {}) as AnalyzeFootwearImageArgs;
+        const args = (toolCall.args ?? {}) as unknown as AnalyzeFootwearImageArgs;
         return toolCall.result || { 
           status: 'analyzing', 
           message: 'Analyzing footwear images to extract measurements and technical specifications.',
@@ -362,19 +366,16 @@ export function ResearchChat({
         };
       }
       if (toolCall.toolName === 'requestTechnicalBlueprint') {
-        const args = (toolCall.args || {}) as RequestTechnicalBlueprintArgs;
-        // Use first image URL for backward compatibility, but support multiple images
-        const primaryImageUrl = args.imageUrls && args.imageUrls.length > 0 
-          ? args.imageUrls[0] 
-          : (args as any).imageUrl; // Fallback for old format
+        const args = (toolCall.args ?? {}) as unknown as RequestTechnicalBlueprintArgs & { imageUrl?: string };
+        const primaryImageUrl = args.imageUrls?.[0] ?? args.imageUrl;
         onGenerateBlueprint?.({
-          imageUrl: primaryImageUrl,
-          productName: args.productName,
+          imageUrls: primaryImageUrl ? [primaryImageUrl] : [],
+          productName: args.productName ?? '',
         });
-        return { success: true, requested: true };
+        return void 0;
       }
       if (toolCall.toolName === 'renameProject' && projectId) {
-        const args = (toolCall.args || {}) as RenameProjectArgs;
+        const args = (toolCall.args ?? {}) as unknown as RenameProjectArgs;
         
         console.log('[renameProject] onToolCall received:', {
           toolCallId: toolCall.toolCallId,
@@ -386,7 +387,7 @@ export function ResearchChat({
         // If name is missing, wait for tool invocation render (execute function or result state)
         if (!args.name) {
           console.log('[renameProject] No name in onToolCall, will wait for tool invocation render');
-          return { success: true, status: 'pending', message: 'Waiting for name...' };
+          return void 0;
         }
         
         console.log('[renameProject] Executing rename with name:', args.name);
@@ -394,31 +395,32 @@ export function ResearchChat({
           id: projectId,
           name: args.name
         });
-        return { success: true, updated: 'projectName' };
+        return void 0;
       }
       if (toolCall.toolName === 'updateDesignContext' && projectId) {
-        const args = (toolCall.args || {}) as UpdateDesignContextArgs;
+        const args = (toolCall.args ?? {}) as unknown as UpdateDesignContextArgs;
         await runUpdateDesignContext({
           projectId,
           ...args
         });
-        return { success: true, updated: 'designContext' };
+        return void 0;
       }
       if (toolCall.toolName === 'updateBOM' && projectId) {
-        const args = (toolCall.args || {}) as UpdateBOMArgs;
+        const args = (toolCall.args ?? {}) as unknown as UpdateBOMArgs;
         await runUpdateBOM({
           projectId,
+          currency: 'USD',
           ...args
         });
-        return { success: true, updated: 'BOM' };
+        return void 0;
       }
       if (toolCall.toolName === 'updateProductBaselines' && projectId) {
-        const args = (toolCall.args || {}) as UpdateProductBaselinesArgs;
+        const args = (toolCall.args ?? {}) as unknown as UpdateProductBaselinesArgs;
         await runUpdateBaseline({
           projectId,
           ...args
         });
-        return { success: true, updated: 'productBaseline' };
+        return void 0;
       }
       if (toolCall.toolName === 'generateImage') {
         const toolCallId = toolCall.toolCallId;
@@ -438,21 +440,24 @@ export function ResearchChat({
         // The execute function's return value becomes toolCall.result
         // We MUST return it to satisfy AI SDK's requirement
         // Always return a result - use execute result if available, otherwise construct from args
-        const result = toolCall.result || {
-          prompt: toolCall.args?.prompt || '',
-          aspectRatio: toolCall.args?.aspectRatio || '1:1',
-          referenceImage: toolCall.args?.referenceImage,
+        const args = toolCall.args as { prompt?: string; aspectRatio?: string; referenceImage?: string } | undefined;
+        const result = (toolCall.result as { prompt?: string; aspectRatio?: string; referenceImage?: string } | undefined) || {
+          prompt: args?.prompt ?? '',
+          aspectRatio: args?.aspectRatio ?? '1:1',
+          referenceImage: args?.referenceImage,
           status: 'initiated',
           message: 'Image generation workflow started. The image will appear when generation completes.',
         };
         
         console.log('[generateImage] onToolCall returning result:', result);
-        return result;
+        void result; // SDK may use result from execute; callback type is void
+        return;
       }
-      return { success: true };
-    },
-    onFinish: (message) => {
-      // Save assistant message to Convex
+      return void 0;
+     },
+     onFinish: (options: { message: UIMessage }) => {
+       const message = options.message;
+       // Save assistant message to Convex
       if (projectId && message && Array.isArray(message.parts)) {
         // Skip if already saved
         if (savedMessageIdsRef.current.has(message.id)) {
@@ -467,13 +472,9 @@ export function ResearchChat({
           partsCount: message.parts?.length || 0,
         });
 
-        const textContent = message.parts.find(p => p.type === 'text')?.text || '';
-        const fileParts = message.parts.filter((p) => p.type === 'file') as {
-          type: 'file';
-          url: string;
-          mediaType: string;
-          filename?: string;
-        }[];
+        const textPart = message.parts.find((p): p is TextUIPart => p.type === 'text');
+        const textContent = textPart?.text ?? '';
+        const fileParts = message.parts.filter((p): p is FileUIPart => p.type === 'file');
 
         if (textContent || fileParts.length > 0) {
           const assistantTimestamp = Date.now();
@@ -530,10 +531,10 @@ export function ResearchChat({
         }
       }
     },
-    onError: (error) => {
-      console.error('Chat error:', error);
-    },
-  });
+     onError: (error: Error) => {
+       console.error('Chat error:', error);
+     },
+  } as Parameters<typeof useChat>[0]);
 
   // Track last synced projectId and message IDs to avoid duplicate syncs
   const lastSyncedRef = useRef<{ projectId?: Id<'projects'>; messageIds: Set<string> }>({ messageIds: new Set() });
@@ -568,12 +569,10 @@ export function ResearchChat({
     // Check if this assistant message is still streaming
     const hasStreamingParts = lastMessage.parts?.some(p => {
       if (p.type === 'text') {
-        const textPart = p as any;
-        return textPart.state === 'streaming';
+        return (p as TextUIPart).state === 'streaming';
       }
       if (p.type === 'reasoning') {
-        const reasoningPart = p as any;
-        return reasoningPart.state === 'streaming';
+        return (p as { type: 'reasoning'; state?: string }).state === 'streaming';
       }
       return false;
     });
@@ -589,7 +588,7 @@ export function ResearchChat({
     if (persistedMessages === undefined || !projectId) return;
     
     // Don't sync if currently loading/streaming to avoid overwriting in-progress messages
-    if (status === 'submitted' || status === 'streaming' || hasUnsavedAssistantMessage) {
+    if ((status as ChatStatus) === 'submitted' || (status as ChatStatus) === 'streaming' || hasUnsavedAssistantMessage) {
       return;
     }
     
@@ -679,6 +678,8 @@ export function ResearchChat({
 
   // Track which messages we've already saved to avoid duplicates
   const savedMessageIdsRef = useRef<Set<string>>(new Set());
+  // Track auto-sent image URLs per toolCallId (avoids duplicate send from onComplete)
+  const autoSendByToolCallIdRef = useRef<Map<string, string | null>>(new Map());
 
   // Reset saved message tracking when projectId changes
   useEffect(() => {
@@ -702,13 +703,9 @@ export function ResearchChat({
       
       // Save user messages
       if (message.role === 'user') {
-        const textContent = message.parts?.find(p => p.type === 'text')?.text || '';
-        const fileParts = message.parts?.filter((p) => p.type === 'file') as {
-          type: 'file';
-          url: string;
-          mediaType: string;
-          filename?: string;
-        }[] || [];
+        const textPart = message.parts?.find((p): p is TextUIPart => p.type === 'text');
+        const textContent = textPart?.text ?? '';
+        const fileParts = message.parts?.filter((p): p is FileUIPart => p.type === 'file') ?? [];
 
         if (textContent || fileParts.length > 0) {
           savedMessageIdsRef.current.add(message.id);
@@ -748,24 +745,18 @@ export function ResearchChat({
         // Check if message is complete (not streaming)
         const isComplete = !message.parts?.some(p => {
           if (p.type === 'text') {
-            const textPart = p as any;
-            return textPart.state === 'streaming';
+            return (p as TextUIPart).state === 'streaming';
           }
           if (p.type === 'reasoning') {
-            const reasoningPart = p as any;
-            return reasoningPart.state === 'streaming';
+            return (p as { type: 'reasoning'; state?: string }).state === 'streaming';
           }
           return false;
         }) && status !== 'streaming';
         
         if (isComplete) {
-          const textContent = message.parts?.find(p => p.type === 'text')?.text || '';
-          const fileParts = message.parts?.filter((p) => p.type === 'file') as {
-            type: 'file';
-            url: string;
-            mediaType: string;
-            filename?: string;
-          }[] || [];
+          const textPart = message.parts?.find((p): p is TextUIPart => p.type === 'text');
+          const textContent = textPart?.text ?? '';
+          const fileParts = message.parts?.filter((p): p is FileUIPart => p.type === 'file') ?? [];
 
           if (textContent || fileParts.length > 0) {
             savedMessageIdsRef.current.add(message.id);
@@ -919,87 +910,36 @@ export function ResearchChat({
       lastMessageRole: messages[messages.length - 1]?.role,
       lastMessageParts: messages[messages.length - 1]?.parts?.map(p => ({
         type: p.type,
-        toolName: p.type === 'tool-invocation' ? p.toolInvocation?.toolName : undefined,
-        state: p.type === 'tool-invocation' ? p.toolInvocation?.state : undefined,
+        toolName: isToolUIPart(p) ? getToolName(p) : undefined,
+        state: isToolUIPart(p) ? p.state : undefined,
       })),
     });
     
     messages.forEach((message) => {
       if (message.role === 'assistant' && message.parts) {
         message.parts.forEach((part) => {
+          if (!isToolUIPart(part)) return;
+          const toolName = getToolName(part);
+          if (toolName !== 'generateImage') return;
+
+          const toolCallId = part.toolCallId;
+          const state = part.state;
+          const args = part.state !== 'input-streaming' ? (part.input as GenerateImageArgs | undefined) : undefined;
+          const result = part.state === 'output-available' ? (part.output as GenerateImageWorkflowResult | undefined) : undefined;
+
           console.log('[generateImage useEffect] 🔍 Checking part:', {
             type: part.type,
-            partKeys: Object.keys(part),
-            fullPart: JSON.stringify(part, null, 2),
-            toolInvocation: part.type === 'tool-invocation' ? {
-              toolName: part.toolInvocation?.toolName,
-              toolCallId: part.toolInvocation?.toolCallId,
-              state: part.toolInvocation?.state,
-              hasArgs: !!part.toolInvocation?.args,
-            } : undefined,
-            // Check for tool-generateImage type
-            isToolGenerateImage: part.type === 'tool-generateImage',
-            toolCallId: (part as any).toolCallId,
-            args: (part as any).args,
-            result: (part as any).result,
-            output: (part as any).output,
-            toolCall: (part as any).toolCall,
+            toolCallId,
+            state,
+            hasArgs: !!args,
+            hasResult: !!result,
           });
           
-          // Check for both 'tool-invocation' and 'tool-generateImage' types
-          const isToolInvocation = part.type === 'tool-invocation' && part.toolInvocation?.toolName === 'generateImage';
-          const isToolGenerateImage = part.type === 'tool-generateImage' || part.type?.startsWith('tool-');
+          // Remove from pending once we've matched it
+          pendingToolCallsRef.current.delete(toolCallId);
           
-          if (isToolInvocation || isToolGenerateImage) {
-            // Extract tool call ID and args/result from different formats
-            let toolCallId: string | undefined;
-            let args: GenerateImageArgs | undefined;
-            let result: GenerateImageResult | undefined;
-            let state: string | undefined;
-            
-            if (part.type === 'tool-invocation') {
-              toolCallId = part.toolInvocation?.toolCallId;
-              args = part.toolInvocation?.args as GenerateImageArgs;
-              result = part.toolInvocation?.state === 'result' ? (part.toolInvocation.result as GenerateImageResult) : undefined;
-              state = part.toolInvocation?.state;
-            } else {
-              // Handle tool-generateImage or other tool-* formats
-              // For tool-generateImage, check all possible properties
-              const partAny = part as any;
-              toolCallId = partAny.toolCallId || partAny.toolInvocation?.toolCallId || partAny.toolCall?.toolCallId;
-              args = partAny.args || partAny.toolInvocation?.args || partAny.toolCall?.args;
-              result = partAny.result || partAny.toolInvocation?.result || partAny.output || partAny.toolCall?.result;
-              state = partAny.state || partAny.toolInvocation?.state || partAny.status || 'call';
-              
-              // If no toolCallId but we have pending tool calls, try to match by checking if this part has result data
-              if (!toolCallId && part.type === 'tool-generateImage') {
-                // Find the most recent pending tool call (likely this one)
-                const pendingEntries = Array.from(pendingToolCallsRef.current.entries());
-                if (pendingEntries.length > 0) {
-                  const [mostRecentId] = pendingEntries.sort((a, b) => b[1].timestamp - a[1].timestamp)[0];
-                  toolCallId = mostRecentId;
-                  console.log('[generateImage useEffect] Matched tool-generateImage part to pending toolCallId:', toolCallId);
-                }
-              }
-            }
-            
-            // Only process if it's generateImage tool and we have a toolCallId
-            if (!toolCallId) {
-              return;
-            }
-            
-            // Remove from pending once we've matched it
-            pendingToolCallsRef.current.delete(toolCallId);
-            
-            if (isToolInvocation || part.type === 'tool-generateImage') {
-              // Extract prompt from args/result
-              // The execute function returns { prompt, aspectRatio, referenceImage } which becomes the result
-              // For tool-generateImage, the result might be directly on the part or nested
-              const partAny = part as any;
-              
-              // Try all possible locations for the execute result
-              const executeResult = result || partAny.result || partAny.output || partAny.toolInvocation?.result || 
-                                   (state === 'output-available' ? partAny : null);
+          // Extract prompt from args/result (execute function returns args; output-available has result)
+          const executeResult = result ?? (state === 'output-available' ? (part.output as GenerateImageWorkflowResult | null) : null);
               
               // Extract prompt from result or args
               const prompt = executeResult?.prompt || result?.prompt || args?.prompt;
@@ -1038,14 +978,11 @@ export function ResearchChat({
             // If no reference image in args/result, try to find one in message attachments
             if (!referenceImage) {
               const currentMessage = messages.find(m => 
-                m.parts?.some(p => 
-                  p.type === 'tool-invocation' && 
-                  p.toolInvocation?.toolCallId === toolCallId
-                )
+                m.parts?.some(p => isToolUIPart(p) && p.toolCallId === toolCallId)
               );
               
               if (currentMessage) {
-                const imageParts = currentMessage.parts?.filter(p => p.type === 'file' && p.mediaType?.startsWith('image/'));
+                const imageParts = currentMessage.parts?.filter((p): p is FileUIPart => p.type === 'file' && p.mediaType?.startsWith('image/'));
                 if (imageParts && imageParts.length > 0) {
                   referenceImage = imageParts[0].url;
                 } else {
@@ -1054,9 +991,9 @@ export function ResearchChat({
                   for (let i = messageIndex - 1; i >= 0; i--) {
                     const prevMessage = messages[i];
                     if (prevMessage.role === 'user') {
-                      const imageParts = prevMessage.parts?.filter(p => p.type === 'file' && p.mediaType?.startsWith('image/'));
-                      if (imageParts && imageParts.length > 0) {
-                        referenceImage = imageParts[0].url;
+                      const prevImageParts = prevMessage.parts?.filter((p): p is FileUIPart => p.type === 'file' && p.mediaType?.startsWith('image/'));
+                      if (prevImageParts && prevImageParts.length > 0) {
+                        referenceImage = prevImageParts[0].url;
                         break;
                       }
                     }
@@ -1065,18 +1002,10 @@ export function ResearchChat({
               }
             }
             
-            // Check if executeResult already has a URL (workflow completed synchronously or from previous run)
-            const resultUrl = executeResult?.url || result?.url;
+            // If executeResult already has a URL (workflow completed), mark as processed; Convex/ImageGenerationState drives UI
+            const resultUrl = (executeResult as GenerateImageWorkflowResult | null)?.url ?? (result as GenerateImageWorkflowResult | undefined)?.url;
             if (resultUrl && typeof resultUrl === 'string' && resultUrl.startsWith('http')) {
-              console.log('[generateImage useEffect] ✅ Found URL in result, using directly:', {
-                toolCallId,
-                url: resultUrl,
-              });
-              setGeneratingImages(prev => new Map(prev).set(toolCallId, {
-                status: 'completed',
-                url: resultUrl,
-                model: executeResult?.model || result?.model || 'nano-banana-pro',
-              }));
+              console.log('[generateImage useEffect] ✅ Found URL in result, marking processed:', { toolCallId, url: resultUrl });
               processedToolCallsRef.current.add(toolCallId);
               return;
             }
@@ -1160,8 +1089,6 @@ export function ResearchChat({
                   }).catch(console.error);
                 });
               }
-            }
-          }
         });
       }
     });
@@ -1340,30 +1267,13 @@ export function ResearchChat({
                     );
                   }
                   
-                  // Handle both tool-invocation and tool-generateImage types
-                  if (part.type === 'tool-invocation' || part.type === 'tool-generateImage' || part.type?.startsWith('tool-')) {
-                    // Extract tool info from different formats
-                    let toolName: string | undefined;
-                    let toolCallId: string | undefined;
-                    let state: string | undefined;
-                    let toolInvocationArgs: any;
-                    let toolInvocationResult: any;
-                    
-                    if (part.type === 'tool-invocation') {
-                      toolName = part.toolInvocation?.toolName;
-                      toolCallId = part.toolInvocation?.toolCallId;
-                      state = part.toolInvocation?.state;
-                      toolInvocationArgs = part.toolInvocation?.args;
-                      toolInvocationResult = part.toolInvocation?.result;
-                    } else {
-                      // Handle tool-generateImage or other tool-* formats
-                      const partAny = part as any;
-                      toolCallId = partAny.toolCallId || partAny.toolInvocation?.toolCallId || partAny.toolCall?.toolCallId;
-                      toolName = partAny.toolName || partAny.toolInvocation?.toolName || partAny.toolCall?.toolName || 'generateImage';
-                      state = partAny.state || partAny.toolInvocation?.state || partAny.status || 'call';
-                      toolInvocationArgs = partAny.args || partAny.toolInvocation?.args || partAny.toolCall?.args;
-                      toolInvocationResult = partAny.result || partAny.toolInvocation?.result || partAny.output || partAny.toolCall?.result;
-                    }
+                  // Handle tool parts (AI SDK: type is tool-${toolName}, props on part)
+                  if (isToolUIPart(part)) {
+                    const toolName = getToolName(part);
+                    const toolCallId = part.toolCallId;
+                    const state = part.state;
+                    const toolInvocationArgs = part.state !== 'input-streaming' ? (part.input as Record<string, unknown> | undefined) : undefined;
+                    const toolInvocationResult = part.state === 'output-available' ? (part.output as unknown) : undefined;
                     
                     console.log('[tool-invocation] 🔍 Processing tool invocation:', {
                       toolName,
@@ -1382,8 +1292,8 @@ export function ResearchChat({
                     }
                     
                     if (toolName === 'renameProject') {
-                      const args = (toolInvocationArgs || {}) as RenameProjectArgs;
-                      const result = state === 'result' ? (toolInvocationResult as { name?: string } | null) : null;
+                      const args = (toolInvocationArgs ?? {}) as unknown as RenameProjectArgs;
+                      const result = state === 'output-available' ? (toolInvocationResult as { name?: string } | null) : null;
                       
                       // Extract name from args or result
                       const name = args?.name || result?.name;
@@ -1399,7 +1309,7 @@ export function ResearchChat({
                       });
                       
                       // If we have a name and we're in result state, execute the rename
-                      if (name && state === 'result' && projectId) {
+                      if (name && state === 'output-available' && projectId) {
                         // Execute rename in the background
                         runRenameProject({
                           id: projectId,
@@ -1432,7 +1342,7 @@ export function ResearchChat({
                     }
 
                     if (toolName === 'generateSoleSpec') {
-                      const args = (toolInvocationArgs || {}) as GenerateSoleSpecArgs;
+                      const args = (toolInvocationArgs ?? {}) as unknown as GenerateSoleSpecArgs;
                       
                       return (
                         <div key={toolCallId} className="mt-4 bg-card border border-border rounded-2xl overflow-hidden shadow-2xl">
@@ -1517,8 +1427,8 @@ export function ResearchChat({
                     }
 
                     if (toolName === 'analyzeFootwearImage') {
-                      const args = (toolInvocationArgs || {}) as AnalyzeFootwearImageArgs;
-                      const result = state === 'result' ? (toolInvocationResult as { status?: string; message?: string } | null) : null;
+                      const args = (toolInvocationArgs ?? {}) as unknown as AnalyzeFootwearImageArgs;
+                      const result = state === 'output-available' ? (toolInvocationResult as { status?: string; message?: string } | null) : null;
                       const isAnalyzing = !result || result.status === 'analyzing';
                       
                       return (
@@ -1571,9 +1481,9 @@ export function ResearchChat({
                     }
 
                     if (toolName === 'requestTechnicalBlueprint') {
-                      const args = (toolInvocationArgs || {}) as RequestTechnicalBlueprintArgs;
+                      const args = (toolInvocationArgs ?? {}) as unknown as RequestTechnicalBlueprintArgs;
                       // Support both new format (imageUrls array) and old format (imageUrl string)
-                      const imageUrls = args.imageUrls || ((args as any).imageUrl ? [(args as any).imageUrl] : []);
+                      const imageUrls = args.imageUrls ?? ((args as RequestTechnicalBlueprintArgs & { imageUrl?: string }).imageUrl ? [(args as RequestTechnicalBlueprintArgs & { imageUrl?: string }).imageUrl!] : []);
                       const primaryImageUrl = imageUrls[0] || '';
                       
                       return (
@@ -1622,8 +1532,8 @@ export function ResearchChat({
                           <div className="px-4 py-3 bg-muted border-t border-border flex justify-end gap-2">
                             <button 
                               onClick={() => onGenerateBlueprint?.({
-                                imageUrl: primaryImageUrl,
-                                productName: args.productName,
+                                imageUrls: primaryImageUrl ? [primaryImageUrl] : [],
+                                productName: args.productName ?? '',
                               })}
                               className="flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold text-primary-foreground hover:bg-primary/90 transition-all bg-primary px-6 py-2 rounded-xl shadow-lg hover:shadow-primary/20"
                             >
@@ -1636,7 +1546,7 @@ export function ResearchChat({
                     }
 
                     if (toolName === 'updateProductBaselines') {
-                      const args = (toolInvocationArgs || {}) as UpdateProductBaselinesArgs;
+                      const args = (toolInvocationArgs ?? {}) as unknown as UpdateProductBaselinesArgs;
                       
                       return (
                         <div key={toolCallId} className="mt-4 bg-card border border-border rounded-2xl overflow-hidden shadow-2xl">
@@ -1690,18 +1600,16 @@ export function ResearchChat({
                     }
 
                     if (toolName === 'generateImage' && toolCallId) {
-                      console.log('[generateImage RENDER] 🎨🎨🎨 RENDERING TOOL INVOCATION:', {
+                      console.log('[generateImage RENDER] 🎨 RENDERING TOOL INVOCATION:', {
                         toolCallId,
                         state,
                         partType: part.type,
-                        hasToolInvocation: !!part.toolInvocation,
-                        toolInvocationKeys: part.toolInvocation ? Object.keys(part.toolInvocation) : [],
                         hasArgs: !!toolInvocationArgs,
                         hasResult: !!toolInvocationResult,
                       });
                       
-                      const args = (toolInvocationArgs || {}) as GenerateImageArgs;
-                      const result = state === 'result' ? (toolInvocationResult as GenerateImageResult | null) : null;
+                      const args = (toolInvocationArgs ?? {}) as unknown as GenerateImageArgs;
+                      const result = state === 'output-available' ? (toolInvocationResult as GenerateImageResult | null) : null;
                       
                       // Extract prompt from args or result (execute function returns the args)
                       const prompt = args?.prompt || result?.prompt;
@@ -1720,28 +1628,23 @@ export function ResearchChat({
                       if (!referenceImage) {
                         // Find the message containing this tool invocation
                         const currentMessage = messages.find(m => 
-                          m.parts?.some(p => 
-                            p.type === 'tool-invocation' && 
-                            p.toolInvocation?.toolCallId === toolCallId
-                          )
+                          m.parts?.some(p => isToolUIPart(p) && p.toolCallId === toolCallId)
                         );
                         
-                        // Look for image attachments in the same message or previous user messages
                         if (currentMessage) {
-                          const imageParts = currentMessage.parts?.filter(p => p.type === 'file' && p.mediaType?.startsWith('image/'));
+                          const imageParts = currentMessage.parts?.filter((p): p is FileUIPart => p.type === 'file' && p.mediaType?.startsWith('image/'));
                           if (imageParts && imageParts.length > 0) {
                             referenceImage = imageParts[0].url;
                             console.log('[generateImage] Found reference image in message attachments:', referenceImage.substring(0, 50));
                           } else {
-                            // Check previous user messages for images
                             const messageIndex = messages.findIndex(m => m.id === currentMessage.id);
                             for (let i = messageIndex - 1; i >= 0; i--) {
                               const prevMessage = messages[i];
                               if (prevMessage.role === 'user') {
-                                const imageParts = prevMessage.parts?.filter(p => p.type === 'file' && p.mediaType?.startsWith('image/'));
-                                if (imageParts && imageParts.length > 0) {
-                                  referenceImage = imageParts[0].url;
-                                  console.log('[generateImage] Found reference image in previous message:', referenceImage.substring(0, 50));
+                                const prevImageParts = prevMessage.parts?.filter((p): p is FileUIPart => p.type === 'file' && p.mediaType?.startsWith('image/'));
+                                if (prevImageParts && prevImageParts.length > 0) {
+                                  referenceImage = prevImageParts[0].url;
+                                  console.log('[generateImage] Found reference image in previous message:', referenceImage?.substring(0, 50) ?? '');
                                   break;
                                 }
                               }
@@ -1750,20 +1653,16 @@ export function ResearchChat({
                         }
                       }
                       
-                      // Use ImageGenerationState wrapper to query Convex state reactively
-                      // Key is important for React to properly track and re-render this component
                       console.log('[generateImage RENDER] About to render ImageGenerationState with toolCallId:', toolCallId);
-                      
-                      const autoSendRef = useRef<string | null>(null);
 
                       return (
                         <ImageGenerationState 
                           key={`img-gen-${toolCallId}`} 
                           toolCallId={toolCallId}
                           onComplete={(url) => {
-                            // Only auto-send once per toolCallId
-                            if (autoSendRef.current === url) return;
-                            autoSendRef.current = url;
+                            const sent = autoSendByToolCallIdRef.current.get(toolCallId);
+                            if (sent === url) return;
+                            autoSendByToolCallIdRef.current.set(toolCallId, url);
                             
                             console.log('[generateImage] Auto-sending to canvas:', url);
                             onSendToCanvas({
@@ -1788,7 +1687,7 @@ export function ResearchChat({
                             
                             // Determine state from Convex query result
                             const isCompleted = imageState?.status === 'completed' && !!imageState?.url;
-                            const isError = imageState?.status === 'error' || (state === 'result' && !prompt && !imageState);
+                            const isError = imageState?.status === 'error' || (state === 'output-available' && !prompt && !imageState);
                             const isGenerating = 
                               !isCompleted && !isError && (
                                 imageState?.status === 'generating' || 
@@ -1852,7 +1751,7 @@ export function ResearchChat({
                                 </div>
                                 <div className="flex gap-2">
                                   <button
-                                    onClick={() =>                                     onSendToCanvas({
+                                    onClick={() => onSendToCanvas({
                                       type: 'image',
                                       imageUrl: imageState.url!,
                                       title: 'Research Design Concept',
@@ -1928,7 +1827,7 @@ export function ResearchChat({
                               </div>
                             )}
                             
-                            {!prompt && state === 'result' && !isError && (
+                            {!prompt && state === 'output-available' && !isError && (
                               <div className="aspect-square bg-yellow-500/10 rounded-xl flex items-center justify-center border border-yellow-500/20">
                                 <div className="flex flex-col items-center gap-2 px-4 text-center">
                                   <span className="text-[10px] text-yellow-500 uppercase tracking-widest">Waiting for Prompt</span>
@@ -1944,8 +1843,8 @@ export function ResearchChat({
                       );
                     }
 
-                    if (toolName === 'sendToCanvas' && state === 'result') {
-                      const args = (toolInvocationArgs || {}) as SendToCanvasArgs;
+                    if (toolName === 'sendToCanvas' && state === 'output-available') {
+                      const args = (toolInvocationArgs ?? {}) as unknown as SendToCanvasArgs;
                       const { title, content } = args;
                       return (
                         <div key={toolCallId} className="mt-4 pt-4 flex justify-between items-center bg-emerald-500/5 -mx-4 px-4 py-3 border-y border-emerald-500/10">
@@ -1954,7 +1853,7 @@ export function ResearchChat({
                             <span className="text-xs text-muted-foreground font-medium">{title || 'Untitled'}</span>
                           </div>
                           <button 
-                            onClick={() => onSendToCanvas({ content, title, type: args.type })}
+                            onClick={() => onSendToCanvas({ title: title ?? 'Untitled', content: content ?? '', type: args.type })}
                             className="flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold text-primary-foreground hover:text-emerald-400 transition-colors bg-primary hover:bg-primary/90 px-3 py-1.5 rounded-lg border border-border"
                           >
                             <Sparkles size={12} />
@@ -1969,13 +1868,14 @@ export function ResearchChat({
                 })}
                 
                 {/* Fallback for old messages without tool calls but with long content */}
-                {message.role === 'assistant' && !message.parts.some(p => p.type === 'tool-invocation') && message.parts.some(p => p.type === 'text' && p.text.length > 200) && (
+                {message.role === 'assistant' && !message.parts.some(p => isToolUIPart(p)) && message.parts.some((p): p is TextUIPart => p.type === 'text' && (p as TextUIPart).text.length > 200) && (
                   <div className="mt-4 pt-4 border-t border-border flex justify-between items-center">
                     <span className="text-[10px] uppercase tracking-widest text-muted-foreground">Intelligence Card</span>
                     <button 
                       onClick={() => {
-                        const textContent = message.parts.find(p => p.type === 'text')?.text || '';
-                        onSendToCanvas({ content: textContent, type: 'research', data: { source: 'research' } });
+                        const textPart = message.parts.find((p): p is TextUIPart => p.type === 'text');
+                        const textContent = textPart?.text ?? '';
+                        onSendToCanvas({ title: 'Research Note', content: textContent, type: 'research', data: { source: 'research' } });
                       }}
                       className="flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold text-foreground hover:text-emerald-400 transition-colors"
                     >
@@ -2012,3 +1912,4 @@ export function ResearchChat({
     </div>
   );
 }
+

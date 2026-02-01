@@ -1,4 +1,5 @@
 import { Id, Doc } from "../../convex/_generated/dataModel";
+export type { Id, Doc };
 
 export type WorkspaceMode = 'research' | 'studio';
 export type GenMode = 'research' | 'ideation' | 'technical' | 'material';
@@ -111,6 +112,9 @@ export interface GenerateImageResult {
   aspectRatio: string;
   referenceImage?: string;
 }
+
+/** Result from image workflow (Convex) may include url/model */
+export type GenerateImageWorkflowResult = GenerateImageResult & { url?: string; model?: string };
 
 // Message attachment types
 export interface MessageAttachment {

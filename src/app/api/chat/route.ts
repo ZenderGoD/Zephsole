@@ -67,7 +67,7 @@ export async function POST(req: Request) {
       .filter((msg: ChatMessage) => msg && msg.role && (msg.role === 'user' || msg.role === 'assistant' || msg.role === 'system'))
       .map((msg: ChatMessage) => {
         const parts = Array.isArray(msg.parts) ? msg.parts : 
-                     Array.isArray(msg.content) ? (msg.content as Array<NonNullable<ChatMessage['parts']>[number]>) : 
+                     Array.isArray(msg.content) ? (msg.content as Array<any>) : 
                      typeof msg.content === 'string' ? [{ type: 'text', text: msg.content }] : [];
 
         return {
@@ -137,7 +137,7 @@ export async function POST(req: Request) {
 
     const result = await streamText({
       model: openrouter('google/gemini-3-flash-preview'),
-      messages: coreMessages,
+      messages: coreMessages as any,
       system: systemPrompt,
       tools: {
         sendToCanvas: tool({
@@ -148,12 +148,11 @@ export async function POST(req: Request) {
             type: z.enum(['research', 'material', 'concept']),
             agent: z.enum(['zeph', 'analyst', 'maker', 'artist']).optional(),
           }),
-        }),
+        } as any),
         renameProject: tool({
           description: 'Rename the project.',
           parameters: z.object({ name: z.string().min(1) }),
-          execute: async ({ name }) => ({ name: name.trim() }),
-        }),
+        } as any),
         updateDesignContext: tool({
           description: 'Update design context.',
           parameters: z.object({
@@ -163,7 +162,7 @@ export async function POST(req: Request) {
             targetAudience: z.string().optional(),
             summary: z.string().optional(),
           }),
-        }),
+        } as any),
         generateImage: tool({
           description: 'Generate footwear image.',
           parameters: z.object({
@@ -171,8 +170,7 @@ export async function POST(req: Request) {
             aspectRatio: z.enum(['1:1', '16:9', '9:16', '4:3', '3:4']).optional(),
             referenceImage: z.string().optional(),
           }),
-          execute: async (params) => ({ ...params, status: 'initiated' }),
-        })
+        } as any)
       },
     });
 
