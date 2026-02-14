@@ -1,4 +1,4 @@
-import { mutation, query, QueryCtx } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 import { ConvexError, v } from "convex/values";
 import { isAdminUser, requireAuthUserId } from "./authUtils";
 
@@ -32,13 +32,19 @@ export const listAssets = query({
     type: v.union(v.literal("landing"), v.literal("studio"), v.literal("showcase")),
   },
   handler: async (ctx, args) => {
+    // Query siteAssets by type index
     const assets = await ctx.db
       .query("siteAssets")
       .withIndex("by_type", (q) => q.eq("type", args.type))
       .collect();
     
     // Sort by createdAt descending (most recent first)
-    return assets.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    // Handle potential undefined createdAt values
+    return assets.sort((a, b) => {
+      const aTime = a.createdAt ?? 0;
+      const bTime = b.createdAt ?? 0;
+      return bTime - aTime;
+    });
   },
 });
 
