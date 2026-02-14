@@ -56,6 +56,52 @@ export const listAllUsers = query({
   },
 });
 
+export const findUserByEmail = query({
+  args: { email: v.string() },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("user")
+      .withIndex("email", (q) => q.eq("email", args.email))
+      .unique();
+    
+    if (!user) {
+      return { user: null, accounts: [], message: "User not found in user table" };
+    }
+
+    // Find all accounts for this user
+    const accounts = await ctx.db
+      .query("account")
+      .withIndex("userId", (q) => q.eq("userId", user._id))
+      .collect();
+
+    // Also try to find account by accountId (email)
+    const accountByEmail = await ctx.db
+      .query("account")
+      .withIndex("accountId", (q) => q.eq("accountId", args.email))
+      .collect();
+
+    return {
+      user,
+      accountsByUserId: accounts,
+      accountsByEmail: accountByEmail,
+      userId: user._id,
+    };
+  },
+});
+
+export const listAllAccounts = query({
+  args: {},
+  handler: async (ctx) => {
+    const accounts = await ctx.db.query("account").collect();
+    return accounts.map(acc => ({
+      accountId: acc.accountId,
+      providerId: acc.providerId,
+      userId: acc.userId,
+      hasPassword: !!acc.password,
+    }));
+  },
+});
+
 export const debugWorkshops = query({
   args: {},
   handler: async (ctx) => {

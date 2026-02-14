@@ -8,13 +8,26 @@
  * @module
  */
 
+import type * as admin from "../admin.js";
 import type * as auth from "../auth.js";
+import type * as auth_index from "../auth/index.js";
 import type * as authInternal from "../authInternal.js";
 import type * as authOptions from "../authOptions.js";
 import type * as authSchema from "../authSchema.js";
+import type * as authUtils from "../authUtils.js";
 import type * as backfill from "../backfill.js";
+import type * as betterAuth_adapter from "../betterAuth/adapter.js";
+import type * as betterAuth_auth from "../betterAuth/auth.js";
+import type * as betterAuth_user_metadata from "../betterAuth/user_metadata.js";
 import type * as credits from "../credits.js";
 import type * as debug from "../debug.js";
+import type * as falCrons from "../falCrons.js";
+import type * as falHealth from "../falHealth.js";
+import type * as falKeyLoad from "../falKeyLoad.js";
+import type * as falKeys from "../falKeys.js";
+import type * as falManager from "../falManager.js";
+import type * as generationActions from "../generationActions.js";
+import type * as generationRouter from "../generationRouter.js";
 import type * as http from "../http.js";
 import type * as imageGeneration from "../imageGeneration.js";
 import type * as imageGenerations from "../imageGenerations.js";
@@ -46,13 +59,26 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  admin: typeof admin;
   auth: typeof auth;
+  "auth/index": typeof auth_index;
   authInternal: typeof authInternal;
   authOptions: typeof authOptions;
   authSchema: typeof authSchema;
+  authUtils: typeof authUtils;
   backfill: typeof backfill;
+  "betterAuth/adapter": typeof betterAuth_adapter;
+  "betterAuth/auth": typeof betterAuth_auth;
+  "betterAuth/user_metadata": typeof betterAuth_user_metadata;
   credits: typeof credits;
   debug: typeof debug;
+  falCrons: typeof falCrons;
+  falHealth: typeof falHealth;
+  falKeyLoad: typeof falKeyLoad;
+  falKeys: typeof falKeys;
+  falManager: typeof falManager;
+  generationActions: typeof generationActions;
+  generationRouter: typeof generationRouter;
   http: typeof http;
   imageGeneration: typeof imageGeneration;
   imageGenerations: typeof imageGenerations;

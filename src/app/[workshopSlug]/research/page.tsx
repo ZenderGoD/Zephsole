@@ -1,22 +1,20 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, use } from 'react';
 import { authClient } from '@/lib/auth-client';
-import { AppSidebar } from '@/components/app-sidebar';
 import { ResearchChat } from '@/components/studio/research-chat';
 import { PromptInterface } from '@/components/studio/prompt';
-import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
+import { SidebarInset } from '@/components/ui/sidebar';
 import { useWorkshop } from '@/hooks/use-workshop';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
-import { PromptPayload, SendToCanvasArgs } from '@/lib/types';
-import { LayoutGrid, Search } from 'lucide-react';
+import { PromptPayload } from '@/lib/types';
+import { Search } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Id } from '../../../../convex/_generated/dataModel';
 
 export default function ResearchPage({ params }: { params: Promise<{ workshopSlug: string }> }) {
   const resolvedParams = use(params);
-  const router = useRouter();
   const { data: session, isPending } = authClient.useSession();
   const { activeWorkshopId } = useWorkshop();
   
@@ -25,7 +23,10 @@ export default function ResearchPage({ params }: { params: Promise<{ workshopSlu
   const [isGenerating, setIsGenerating] = useState(false);
   const [currentPrompt, setCurrentPrompt] = useState<PromptPayload | null>(null);
 
-  const project = useQuery(api.projects.getProject, selectedProjectId ? { id: selectedProjectId as any } : "skip");
+  const project = useQuery(
+    api.projects.getProject,
+    selectedProjectId ? { id: selectedProjectId as Id<"projects"> } : "skip",
+  );
   const dequeueMessage = useMutation(api.projects.dequeueMessage);
 
   const handleGenerationComplete = async () => {
@@ -33,7 +34,7 @@ export default function ResearchPage({ params }: { params: Promise<{ workshopSlu
     setCurrentPrompt(null);
 
     if (selectedProjectId) {
-      const nextItem = await dequeueMessage({ projectId: selectedProjectId as any });
+      const nextItem = await dequeueMessage({ projectId: selectedProjectId as Id<"projects"> });
       if (nextItem) {
         setCurrentPrompt({
           text: nextItem.prompt,
@@ -55,9 +56,7 @@ export default function ResearchPage({ params }: { params: Promise<{ workshopSlu
   }
 
   return (
-    <SidebarProvider>
-      <div className="flex h-screen bg-background text-foreground overflow-hidden font-sans w-full">
-        <AppSidebar />
+    <div className="flex h-screen bg-background text-foreground overflow-hidden font-sans w-full">
         <SidebarInset className="flex-1 relative flex flex-col bg-background border-none!">
           <header className="h-14 border-b border-border flex items-center justify-between px-6 bg-background/50 backdrop-blur-sm z-20">
             <div className="flex items-center gap-4">
@@ -108,7 +107,7 @@ export default function ResearchPage({ params }: { params: Promise<{ workshopSlu
               <>
                 <div className="flex-1 relative overflow-hidden">
                   <ResearchChat 
-                    projectId={selectedProjectId as any}
+                    projectId={selectedProjectId as Id<"projects">}
                     onSendToCanvas={() => {}} // No canvas here in the new view?
                     onGenerateBlueprint={() => {}}
                     pendingMessage={currentPrompt || undefined}
@@ -126,7 +125,7 @@ export default function ResearchPage({ params }: { params: Promise<{ workshopSlu
                 <div className="p-6 border-t border-border bg-background">
                   <div className="max-w-2xl mx-auto w-full">
                     <PromptInterface 
-                      projectId={selectedProjectId as any}
+                      projectId={selectedProjectId as Id<"projects">}
                       userId={session?.user?.id}
                       onGenerate={(payload) => {
                         setCurrentPrompt(payload);
@@ -139,7 +138,6 @@ export default function ResearchPage({ params }: { params: Promise<{ workshopSlu
             )}
           </div>
         </SidebarInset>
-      </div>
-    </SidebarProvider>
+    </div>
   );
 }

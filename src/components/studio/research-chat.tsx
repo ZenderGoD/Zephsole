@@ -18,6 +18,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { authClient } from '@/lib/auth-client';
 import { ImageGenerationState } from './image-generation-state';
+import { FullscreenImageViewer } from '@/components/ui/fullscreen-image-viewer';
 
 function formatMessageTime(timestamp: number): string {
   const date = new Date(timestamp);
@@ -78,25 +79,29 @@ interface ImageGenerationResultProps {
 
 function ImageGenerationResult({ toolCallId, prompt, onSendToCanvas }: ImageGenerationResultProps) {
   const autoSendRef = useRef<string | null>(null);
+  const [fullscreenImages, setFullscreenImages] = useState<Array<{ url: string; alt?: string }>>([]);
+  const [fullscreenIndex, setFullscreenIndex] = useState(0);
+  const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
 
   return (
-    <ImageGenerationState 
-      toolCallId={toolCallId}
-      onComplete={(url) => {
-        if (autoSendRef.current === url) return;
-        autoSendRef.current = url;
-        
-        onSendToCanvas({
-          type: 'image',
-          imageUrl: url,
-          title: 'Research Design Concept',
-          content: prompt || 'Generated footwear concept from research session.',
-          data: { source: 'research' }
-        });
-      }}
-    >
-      {(imageState) => {
-        const isCompleted = imageState?.status === 'completed' && !!imageState?.url;
+    <>
+      <ImageGenerationState 
+        toolCallId={toolCallId}
+        onComplete={(url) => {
+          if (autoSendRef.current === url) return;
+          autoSendRef.current = url;
+          
+          onSendToCanvas({
+            type: 'image',
+            imageUrl: url,
+            title: 'Research Design Concept',
+            content: prompt || 'Generated footwear concept from research session.',
+            data: { source: 'research' }
+          });
+        }}
+      >
+        {(imageState) => {
+        const isCompleted = imageState?.status === 'completed' && (!!imageState?.url || (imageState?.images && imageState.images.length > 0));
         const isError = imageState?.status === 'error';
         const isGenerating = !isCompleted && !isError;
         
@@ -130,31 +135,77 @@ function ImageGenerationResult({ toolCallId, prompt, onSendToCanvas }: ImageGene
             </div>
             
             <div className="p-5 space-y-4">
-              {isCompleted && imageState?.url ? (
+              {isCompleted && (imageState?.url || (imageState?.images && imageState.images.length > 0)) ? (
                 <div className="space-y-3">
-                  <div className="relative group overflow-hidden rounded-xl border-2 border-border">
-                    <img
-                      src={imageState.url}
-                      alt={prompt || 'Generated image'}
-                      className="w-full h-auto transition-transform duration-500 group-hover:scale-105"
-                    />
-                    <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-[8px] uppercase tracking-widest font-bold text-white shadow-xl">
-                      Research Design
+                  {imageState.images && imageState.images.length > 0 ? (
+                    <div className={imageState.images.length > 1 ? "grid grid-cols-2 gap-3" : "space-y-3"}>
+                      {imageState.images.map((img, idx) => (
+                        <div 
+                          key={idx} 
+                          className="relative group overflow-hidden rounded-xl border-2 border-border cursor-pointer"
+                          onClick={() => {
+                            setFullscreenImages(imageState.images!.map(i => ({ url: i.url, alt: prompt || 'Generated image' })));
+                            setFullscreenIndex(idx);
+                            setIsFullscreenOpen(true);
+                          }}
+                        >
+                          <img
+                            src={img.url}
+                            alt={`${prompt || 'Generated image'} ${idx + 1}`}
+                            className="w-full h-auto transition-transform duration-500 group-hover:scale-105"
+                          />
+                          {imageState.images && imageState.images.length > 1 && (
+                            <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-[8px] uppercase tracking-widest font-bold text-white shadow-xl">
+                              {idx + 1}/{imageState.images.length}
+                            </div>
+                          )}
+                        </div>
+                      ))}
                     </div>
-                  </div>
+                  ) : (
+                    <div 
+                      className="relative group overflow-hidden rounded-xl border-2 border-border cursor-pointer"
+                      onClick={() => {
+                        const imageUrl = imageState.url || (imageState.images && imageState.images.length > 0 ? imageState.images[0].url : '');
+                        if (imageUrl) {
+                          setFullscreenImages([{ url: imageUrl, alt: prompt || 'Generated image' }]);
+                          setFullscreenIndex(0);
+                          setIsFullscreenOpen(true);
+                        }
+                      }}
+                    >
+                      <img
+                        src={imageState.url || (imageState.images && imageState.images.length > 0 ? imageState.images[0].url : '')}
+                        alt={prompt || 'Generated image'}
+                        className="w-full h-auto transition-transform duration-500 group-hover:scale-105"
+                      />
+                      <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-[8px] uppercase tracking-widest font-bold text-white shadow-xl">
+                        Research Design
+                      </div>
+                    </div>
+                  )}
                   <div className="flex gap-2">
                     <button
-                      onClick={() => onSendToCanvas({
-                        type: 'image',
-                        imageUrl: imageState.url!,
-                        title: 'Research Design Concept',
-                        content: prompt || 'Generated footwear concept from research session.',
-                        data: { source: 'research' }
-                      })}
+                      onClick={() => {
+                        const imagesToSend = imageState.images && imageState.images.length > 0
+                          ? imageState.images 
+                          : [{ url: imageState.url || (imageState.images && imageState.images.length > 0 ? imageState.images[0].url : ''), storageKey: '' }];
+                        imagesToSend.forEach((img, idx) => {
+                          if (img.url) {
+                            onSendToCanvas({
+                              type: 'image',
+                              imageUrl: img.url,
+                              title: `Research Design Concept ${imagesToSend.length > 1 ? idx + 1 : ''}`,
+                              content: prompt || 'Generated footwear concept from research session.',
+                              data: { source: 'research' }
+                            });
+                          }
+                        });
+                      }}
                       className="flex-1 flex items-center justify-center gap-2 text-[10px] uppercase tracking-widest font-bold text-primary-foreground hover:bg-primary/90 transition-colors bg-primary px-4 py-2 rounded-xl border border-border"
                     >
                       <Sparkles size={12} />
-                      Send to Canvas
+                      Send {imageState.images && imageState.images.length > 1 ? `All (${imageState.images.length})` : ''} to Canvas
                     </button>
                     <button
                       onClick={() => {
@@ -192,7 +243,14 @@ function ImageGenerationResult({ toolCallId, prompt, onSendToCanvas }: ImageGene
           </div>
         );
       }}
-    </ImageGenerationState>
+      </ImageGenerationState>
+      <FullscreenImageViewer
+        images={fullscreenImages}
+        initialIndex={fullscreenIndex}
+        open={isFullscreenOpen}
+        onClose={() => setIsFullscreenOpen(false)}
+      />
+    </>
   );
 }
 
@@ -216,17 +274,64 @@ export function ResearchChat({
   );
 
   const saveMessage = useMutation(api.intelligence.sendMessage);
+  const updateMessageAttachments = useMutation(api.intelligence.updateMessageAttachments);
   const designContext = useQuery(api.studio.getDesignContext, projectId ? { projectId } : 'skip');
   // const productBaseline = useQuery(api.products.getBaseline, projectId ? { projectId } : 'skip');
   const runUpdateDesignContext = useMutation(api.studio.updateDesignContext);
   const runUpdateBOM = useMutation(api.studio.updateBOM);
   const runUpdateBaseline = useMutation(api.products.updateBaseline);
-  const runRenameProject = useMutation(api.projects.renameProject);
+  const runRenameProject = useMutation(api.projects.renameProject).withOptimisticUpdate(
+    (localStore, args) => {
+      // Optimistically update the project query by ID
+      if (projectId) {
+        const currentProject = localStore.getQuery(api.projects.getProject, { id: projectId });
+        if (currentProject !== undefined && currentProject !== null) {
+          localStore.setQuery(
+            api.projects.getProject,
+            { id: projectId },
+            {
+              ...currentProject,
+              name: args.name,
+              lastUpdated: Date.now(),
+            }
+          );
+        }
+      }
+      // Also optimistically update the project query by slug (used by page component)
+      if (projectContext?.workshopName && projectContext?.projectName) {
+        const currentProjectBySlug = localStore.getQuery(api.projects.getProjectBySlug, {
+          workshopSlug: projectContext.workshopName,
+          projectSlug: projectContext.projectName,
+        });
+        if (currentProjectBySlug !== undefined && currentProjectBySlug !== null) {
+          localStore.setQuery(
+            api.projects.getProjectBySlug,
+            {
+              workshopSlug: projectContext.workshopName,
+              projectSlug: projectContext.projectName,
+            },
+            {
+              ...currentProjectBySlug,
+              name: args.name,
+              lastUpdated: Date.now(),
+              messageQueue: currentProjectBySlug.messageQueue || [],
+              threadStatus: currentProjectBySlug.threadStatus || "idle",
+            }
+          );
+        }
+      }
+    }
+  );
   const enqueueMessage = useMutation(api.projects.enqueueMessage);
   const redeemCredits = useMutation(api.credits.redeemCredits);
   // Use action wrapper to start workflow (non-blocking - returns workflowId immediately)
   const startGenerateImage = useAction(api.imageWorkflow.startGenerateImage);
   const upsertGeneration = useMutation(api.imageGenerations.upsertGeneration);
+  
+  // Fullscreen image viewer state
+  const [fullscreenImages, setFullscreenImages] = useState<Array<{ url: string; alt?: string }>>([]);
+  const [fullscreenIndex, setFullscreenIndex] = useState(0);
+  const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
 
   // Get project data for workshopId
   const projectData = useQuery(api.projects.getProject, projectId ? { id: projectId } : 'skip');
@@ -391,10 +496,15 @@ export function ResearchChat({
         }
         
         console.log('[renameProject] Executing rename with name:', args.name);
-        await runRenameProject({
-          id: projectId,
-          name: args.name
-        });
+        try {
+          await runRenameProject({
+            id: projectId,
+            name: args.name
+          });
+          console.log('[renameProject] Successfully renamed project to:', args.name);
+        } catch (error) {
+          console.error('[renameProject] Failed to rename project:', error);
+        }
         return void 0;
       }
       if (toolCall.toolName === 'updateDesignContext' && projectId) {
@@ -421,6 +531,30 @@ export function ResearchChat({
           ...args
         });
         return void 0;
+      }
+      if (toolCall.toolName === 'consultSpecialist') {
+        console.log('[consultSpecialist] onToolCall received:', {
+          toolCallId: toolCall.toolCallId,
+          hasArgs: !!toolCall.args,
+          args: toolCall.args,
+          hasResult: !!toolCall.result,
+          result: toolCall.result,
+          toolCallKeys: Object.keys(toolCall),
+        });
+        
+        // The execute function's return value becomes toolCall.result
+        // We MUST return it to satisfy AI SDK's requirement
+        // If result exists from execute function, use it; otherwise provide fallback
+        const args = toolCall.args as { specialist?: string; question?: string; context?: string } | undefined;
+        const result = toolCall.result || {
+          specialist: args?.specialist || 'analyst',
+          question: args?.question || '',
+          response: `[${args?.specialist || 'analyst'}] Consultation response for: ${args?.question || 'general inquiry'}. ${args?.context ? `Context: ${args.context}. ` : ''}Specialist consultation completed.`,
+          status: 'consulted',
+        };
+        
+        console.log('[consultSpecialist] onToolCall returning result:', result);
+        return result;
       }
       if (toolCall.toolName === 'generateImage') {
         const toolCallId = toolCall.toolCallId;
@@ -450,8 +584,7 @@ export function ResearchChat({
         };
         
         console.log('[generateImage] onToolCall returning result:', result);
-        void result; // SDK may use result from execute; callback type is void
-        return;
+        return result;
       }
       return void 0;
      },
@@ -680,10 +813,81 @@ export function ResearchChat({
   const savedMessageIdsRef = useRef<Set<string>>(new Set());
   // Track auto-sent image URLs per toolCallId (avoids duplicate send from onComplete)
   const autoSendByToolCallIdRef = useRef<Map<string, string | null>>(new Map());
+  // Track which toolCallIds have had their images saved as attachments
+  const savedImageAttachmentsRef = useRef<Set<string>>(new Set());
+
+  // Save generated images as attachments when they complete
+  // This effect watches for completed image generations and saves them to the message
+  const imageGenerations = useQuery(
+    api.imageGenerations.getGenerationsByToolCallIds,
+    projectId && messages.length > 0
+      ? {
+          toolCallIds: messages
+            .flatMap(m => m.parts || [])
+            .filter((p): p is Extract<typeof p, { toolCallId: string }> => 
+              isToolUIPart(p) && getToolName(p) === 'generateImage' && 'toolCallId' in p && typeof p.toolCallId === 'string'
+            )
+            .map(p => p.toolCallId),
+        }
+      : 'skip'
+  );
+
+  useEffect(() => {
+    if (!projectId || !imageGenerations) return;
+
+    imageGenerations.forEach((gen) => {
+      if (gen.status !== 'completed') return;
+      if (savedImageAttachmentsRef.current.has(gen.toolCallId)) return;
+
+      const imagesToSave = gen.images && gen.images.length > 0
+        ? gen.images
+        : gen.url
+          ? [{ url: gen.url, storageKey: gen.storageKey || '' }]
+          : [];
+
+      if (imagesToSave.length === 0) return;
+
+      // Find the assistant message containing this tool invocation
+      const assistantMessage = messages.find(m => 
+        m.role === 'assistant' &&
+        m.parts?.some(p => 
+          isToolUIPart(p) && 
+          p.toolCallId === gen.toolCallId
+        )
+      );
+
+      if (!assistantMessage) {
+        console.warn('[generateImage] Assistant message not found for toolCallId:', gen.toolCallId);
+        return;
+      }
+
+      savedImageAttachmentsRef.current.add(gen.toolCallId);
+      
+      console.log('[generateImage] 💾 Saving images as attachments:', {
+        toolCallId: gen.toolCallId,
+        messageId: assistantMessage.id,
+        imageCount: imagesToSave.length,
+      });
+
+      updateMessageAttachments({
+        messageId: assistantMessage.id,
+        projectId,
+        attachments: imagesToSave.map((img, idx) => ({
+          url: img.url,
+          fileName: `generated-${gen.toolCallId}-${idx + 1}.png`,
+          contentType: 'image/png',
+        })),
+      }).catch((error) => {
+        console.error('[generateImage] ❌ Failed to save image attachments:', error);
+        savedImageAttachmentsRef.current.delete(gen.toolCallId);
+      });
+    });
+  }, [imageGenerations, messages, projectId, updateMessageAttachments]);
 
   // Reset saved message tracking when projectId changes
   useEffect(() => {
     savedMessageIdsRef.current.clear();
+    savedImageAttachmentsRef.current.clear();
     // Mark all persisted messages as already saved
     if (persistedMessages) {
       persistedMessages.forEach((msg: PersistedMessage) => {
@@ -798,6 +1002,18 @@ export function ResearchChat({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastMessageKeyRef = useRef<string>('');
   const isLoading = status === 'submitted' || status === 'streaming';
+  
+  // Track if we're actually generating images (not just chatting)
+  const hasActiveImageGeneration = messages.some(msg => 
+    msg.parts?.some(part => {
+      if (!isToolUIPart(part)) return false;
+      const toolName = getToolName(part);
+      const state = part.state;
+      return toolName === 'generateImage' && 
+        state !== 'output-available' && 
+        state !== 'output-error';
+    })
+  );
 
   useEffect(() => {
     if (!pendingMessage || isLoading || !projectId) return;
@@ -1044,6 +1260,7 @@ export function ResearchChat({
                 userId: userId,
                 workshopId,
                 source: 'research' as const,
+                numImages: 4, // Generate 4 images for research/threads chat
               };
               
               // Start workflow (non-blocking - returns workflowId immediately)
@@ -1099,11 +1316,49 @@ export function ResearchChat({
   const prevIsLoadingRef = useRef(false);
 
   useEffect(() => {
-    if (prevIsLoadingRef.current && !isLoading && isGenerating && onGenerationComplete) {
-      onGenerationComplete();
+    // Reset isGenerating when chat finishes (not just image generation)
+    if (prevIsLoadingRef.current && !isLoading && isGenerating) {
+      // Check if there are any active image generations
+      const hasActiveGenerations = messages.some(msg => 
+        msg.parts?.some(part => {
+          if (!isToolUIPart(part)) return false;
+          const toolName = getToolName(part);
+          const state = part.state;
+          return toolName === 'generateImage' && 
+            state !== 'output-available' && 
+            state !== 'output-error';
+        })
+      );
+      
+      // Only reset isGenerating if there are no active image generations
+      if (!hasActiveGenerations && onGenerationComplete) {
+        onGenerationComplete();
+      }
     }
     prevIsLoadingRef.current = isLoading;
-  }, [isLoading, isGenerating, onGenerationComplete]);
+  }, [isLoading, isGenerating, messages, onGenerationComplete]);
+
+  // Also reset isGenerating when messages finish streaming and there's no pending generation
+  useEffect(() => {
+    if (!isLoading && isGenerating && !pendingMessage) {
+      // Check if there are any active image generations
+      const hasActiveGenerations = messages.some(msg => 
+        msg.parts?.some(part => {
+          if (!isToolUIPart(part)) return false;
+          const toolName = getToolName(part);
+          const state = part.state;
+          return toolName === 'generateImage' && 
+            state !== 'output-available' && 
+            state !== 'output-error';
+        })
+      );
+      
+      // If no active generations, reset isGenerating
+      if (!hasActiveGenerations && onGenerationComplete) {
+        onGenerationComplete();
+      }
+    }
+  }, [isLoading, isGenerating, pendingMessage, messages, onGenerationComplete]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -1310,10 +1565,12 @@ export function ResearchChat({
                       
                       // If we have a name and we're in result state, execute the rename
                       if (name && state === 'output-available' && projectId) {
-                        // Execute rename in the background
+                        // Execute rename and await it to ensure it completes
                         runRenameProject({
                           id: projectId,
                           name: name
+                        }).then(() => {
+                          console.log('[renameProject] Successfully renamed project to:', name);
                         }).catch((error) => {
                           console.error('[renameProject] Failed to rename:', error);
                         });
@@ -1682,11 +1939,14 @@ export function ResearchChat({
                               status: imageState?.status,
                               hasUrl: !!imageState?.url,
                               url: imageState?.url?.substring(0, 50),
+                              hasImages: !!imageState?.images,
+                              imageCount: imageState?.images?.length ?? 0,
+                              images: imageState?.images,
                               fullState: imageState,
                             });
                             
                             // Determine state from Convex query result
-                            const isCompleted = imageState?.status === 'completed' && !!imageState?.url;
+                            const isCompleted = imageState?.status === 'completed' && (!!imageState?.url || (imageState?.images && imageState.images.length > 0));
                             const isError = imageState?.status === 'error' || (state === 'output-available' && !prompt && !imageState);
                             const isGenerating = 
                               !isCompleted && !isError && (
@@ -1735,33 +1995,81 @@ export function ResearchChat({
                           <div className="p-5 space-y-4">
 
                             {/* Generated image or loading state */}
-                            {isCompleted && imageState?.url ? (
+                            {isCompleted && (imageState?.url || (imageState?.images && imageState.images.length > 0)) ? (
                               <div className="space-y-3">
-                                <div className="relative group overflow-hidden rounded-xl border-2 border-border">
-                                  <img
-                                    src={imageState.url}
-                                    alt={args?.prompt || prompt || 'Generated image'}
-                                    className="w-full h-auto transition-transform duration-500 group-hover:scale-105"
-                                    onLoad={() => console.log('[generateImage] ✅ Image loaded:', imageState.url)}
-                                    onError={(e) => console.error('[generateImage] ❌ Image failed to load:', imageState.url, e)}
-                                  />
-                                  <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-[8px] uppercase tracking-widest font-bold text-white shadow-xl">
-                                    Research Design
+                                {imageState.images && imageState.images.length > 0 ? (
+                                  <div className="grid grid-cols-2 gap-3">
+                                    {imageState.images.map((img, idx) => (
+                                      <div 
+                                        key={idx} 
+                                        className="relative group overflow-hidden rounded-xl border-2 border-border cursor-pointer"
+                                        onClick={() => {
+                                          setFullscreenImages(imageState.images!.map(i => ({ url: i.url, alt: `${args?.prompt || prompt || 'Generated image'}` })));
+                                          setFullscreenIndex(idx);
+                                          setIsFullscreenOpen(true);
+                                        }}
+                                      >
+                                        <img
+                                          src={img.url}
+                                          alt={`${args?.prompt || prompt || 'Generated image'} ${idx + 1}`}
+                                          className="w-full h-auto transition-transform duration-500 group-hover:scale-105"
+                                          onLoad={() => console.log('[generateImage] ✅ Image loaded:', img.url)}
+                                          onError={(e) => console.error('[generateImage] ❌ Image failed to load:', img.url, e)}
+                                        />
+                                        {imageState.images && (
+                                          <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-[8px] uppercase tracking-widest font-bold text-white shadow-xl">
+                                            {idx + 1}/{imageState.images.length}
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
                                   </div>
-                                </div>
+                                ) : (
+                                  <div 
+                                    className="relative group overflow-hidden rounded-xl border-2 border-border cursor-pointer"
+                                    onClick={() => {
+                                      const imageUrl = imageState.url || (imageState.images && imageState.images.length > 0 ? imageState.images[0].url : '');
+                                      if (imageUrl) {
+                                        setFullscreenImages([{ url: imageUrl, alt: args?.prompt || prompt || 'Generated image' }]);
+                                        setFullscreenIndex(0);
+                                        setIsFullscreenOpen(true);
+                                      }
+                                    }}
+                                  >
+                                    <img
+                                      src={imageState.url || (imageState.images && imageState.images.length > 0 ? imageState.images[0].url : '')}
+                                      alt={args?.prompt || prompt || 'Generated image'}
+                                      className="w-full h-auto transition-transform duration-500 group-hover:scale-105"
+                                      onLoad={() => console.log('[generateImage] ✅ Image loaded:', imageState.url || imageState.images?.[0]?.url)}
+                                      onError={(e) => console.error('[generateImage] ❌ Image failed to load:', imageState.url || imageState.images?.[0]?.url, e)}
+                                    />
+                                    <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-[8px] uppercase tracking-widest font-bold text-white shadow-xl">
+                                      Research Design
+                                    </div>
+                                  </div>
+                                )}
                                 <div className="flex gap-2">
                                   <button
-                                    onClick={() => onSendToCanvas({
-                                      type: 'image',
-                                      imageUrl: imageState.url!,
-                                      title: 'Research Design Concept',
-                                      content: args?.prompt || prompt || 'Generated footwear concept from research session.',
-                                      data: { source: 'research' }
-                                    })}
+                                    onClick={() => {
+                                      const imagesToSend = imageState.images && imageState.images.length > 0
+                                        ? imageState.images 
+                                        : [{ url: imageState.url || (imageState.images && imageState.images.length > 0 ? imageState.images[0].url : ''), storageKey: '' }];
+                                      imagesToSend.forEach((img, idx) => {
+                                        if (img.url) {
+                                          onSendToCanvas({
+                                            type: 'image',
+                                            imageUrl: img.url,
+                                            title: `Research Design Concept ${imagesToSend.length > 1 ? idx + 1 : ''}`,
+                                            content: args?.prompt || prompt || 'Generated footwear concept from research session.',
+                                            data: { source: 'research' }
+                                          });
+                                        }
+                                      });
+                                    }}
                                     className="flex-1 flex items-center justify-center gap-2 text-[10px] uppercase tracking-widest font-bold text-primary-foreground hover:bg-primary/90 transition-colors bg-primary px-4 py-2 rounded-xl border border-border"
                                   >
                                     <Sparkles size={12} />
-                                    Send to Canvas
+                                    Send {imageState.images && imageState.images.length > 1 ? `All (${imageState.images.length})` : ''} to Canvas
                                   </button>
                                   <button
                                     onClick={() => {
@@ -1909,6 +2217,14 @@ export function ResearchChat({
         <div ref={messagesEndRef} />
         </div>
       </ScrollArea>
+      
+      {/* Fullscreen Image Viewer */}
+      <FullscreenImageViewer
+        images={fullscreenImages}
+        initialIndex={fullscreenIndex}
+        open={isFullscreenOpen}
+        onClose={() => setIsFullscreenOpen(false)}
+      />
     </div>
   );
 }

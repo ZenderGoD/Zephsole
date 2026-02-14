@@ -1,5 +1,6 @@
 import { mutation, query } from "./_generated/server";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
+import { isAdminUser, requireAuthUserId } from "./authUtils";
 
 export const saveAsset = mutation({
   args: {
@@ -11,6 +12,9 @@ export const saveAsset = mutation({
     size: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    await requireAuthUserId(ctx);
+    const admin = await isAdminUser(ctx);
+    if (!admin) throw new ConvexError("ADMIN_ONLY");
     return await ctx.db.insert("siteAssets", {
       type: args.type,
       key: args.objectKey,
@@ -39,6 +43,9 @@ export const listAssets = query({
 export const deleteAsset = mutation({
   args: { id: v.id("siteAssets") },
   handler: async (ctx, args) => {
+    await requireAuthUserId(ctx);
+    const admin = await isAdminUser(ctx);
+    if (!admin) throw new ConvexError("ADMIN_ONLY");
     const asset = await ctx.db.get(args.id);
     if (!asset) return;
     await ctx.db.delete(args.id);

@@ -9,7 +9,7 @@ import { toast } from "sonner";
 
 export default function ReferralsPage() {
   const { data: session } = authClient.useSession();
-  const stats = useQuery(api.referrals.getReferralStats, session?.user.id ? { userId: session.user.id } : "skip");
+  const stats = useQuery(api.referrals.getReferralStats, session?.user.id ? {} : "skip");
 
   const referralCode = stats?.referralCode || "...";
   const referralLink = typeof window !== 'undefined' 

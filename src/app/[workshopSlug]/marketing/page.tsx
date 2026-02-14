@@ -1,27 +1,32 @@
 'use client';
 
 import { useState, use } from 'react';
-import { useRouter } from 'next/navigation';
 import { authClient } from '@/lib/auth-client';
-import { AppSidebar } from '@/components/app-sidebar';
-import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
+import Image from 'next/image';
+import { SidebarInset } from '@/components/ui/sidebar';
 import { useWorkshop } from '@/hooks/use-workshop';
 import { useQuery } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
-import { Layers, LayoutGrid, Image as ImageIcon } from 'lucide-react';
+import { Layers, Image as ImageIcon } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Id } from '../../../../convex/_generated/dataModel';
 
 export default function MarketingPage({ params }: { params: Promise<{ workshopSlug: string }> }) {
-  const resolvedParams = use(params);
-  const router = useRouter();
+  use(params);
   const { data: session, isPending } = authClient.useSession();
   const { activeWorkshopId } = useWorkshop();
   
   const projects = useQuery(api.projects.getProjects, activeWorkshopId ? { workshopId: activeWorkshopId } : "skip");
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
 
-  const canvasItems = useQuery(api.studio.getCanvasItems, selectedProjectId ? { projectId: selectedProjectId as any } : "skip");
-  const project = useQuery(api.projects.getProject, selectedProjectId ? { id: selectedProjectId as any } : "skip");
+  const canvasItems = useQuery(
+    api.studio.getCanvasItems,
+    selectedProjectId ? { projectId: selectedProjectId as Id<"projects"> } : "skip",
+  );
+  const project = useQuery(
+    api.projects.getProject,
+    selectedProjectId ? { id: selectedProjectId as Id<"projects"> } : "skip",
+  );
 
   const renderItems = canvasItems?.filter(item => item.type === 'render' || item.type === 'research-card');
 
@@ -36,9 +41,7 @@ export default function MarketingPage({ params }: { params: Promise<{ workshopSl
   }
 
   return (
-    <SidebarProvider>
-      <div className="flex h-screen bg-background text-foreground overflow-hidden font-sans w-full">
-        <AppSidebar />
+    <div className="flex h-screen bg-background text-foreground overflow-hidden font-sans w-full">
         <SidebarInset className="flex-1 relative flex flex-col bg-background border-none!">
           <header className="h-14 border-b border-border flex items-center justify-between px-6 bg-background/50 backdrop-blur-sm z-20">
             <div className="flex items-center gap-4">
@@ -104,12 +107,15 @@ export default function MarketingPage({ params }: { params: Promise<{ workshopSl
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {renderItems.map((item, i) => (
                       <div key={i} className="group relative aspect-square bg-muted rounded-2xl overflow-hidden border border-border hover:border-primary/50 transition-all">
-                        <img 
+                        <Image
                           src={item.data.imageUrl || item.data.url} 
                           alt="Marketing render" 
+                          fill
+                          unoptimized
+                          sizes="(max-width: 768px) 100vw, 33vw"
                           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" 
                         />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
+                        <div className="absolute inset-0 bg-linear-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
                           <p className="text-white text-xs font-medium truncate">{item.data.prompt || 'Generated Render'}</p>
                         </div>
                       </div>
@@ -126,7 +132,6 @@ export default function MarketingPage({ params }: { params: Promise<{ workshopSl
             )}
           </div>
         </SidebarInset>
-      </div>
-    </SidebarProvider>
+    </div>
   );
 }

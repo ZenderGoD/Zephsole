@@ -3,15 +3,13 @@
 import React, { useState, useRef } from "react";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
-import { useWorkshop } from "@/hooks/use-workshop";
 import { useParams, useRouter } from "next/navigation";
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/app-sidebar";
+import Image from "next/image";
+import { SidebarInset } from "@/components/ui/sidebar";
 import { LayoutGrid, Plus, Loader2, Upload, Pencil, Trash2, Check, X } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { authClient } from "@/lib/auth-client";
 import { Id } from "../../../../convex/_generated/dataModel";
 import { toast } from "sonner";
 
@@ -20,10 +18,8 @@ export default function ProductsPage() {
   const workshopSlug = params.workshopSlug as string;
   const router = useRouter();
   
-  const { activeWorkshopId } = useWorkshop();
   const workshop = useQuery(api.workshops.getWorkshopBySlug, { slug: workshopSlug });
-  const workshopId = workshop?._id || activeWorkshopId;
-  const { data: session } = authClient.useSession();
+  const workshopId = workshop?._id;
   
   const allProjects = useQuery(api.projects.getProjects, workshopId ? { workshopId } : "skip");
   const projects = allProjects?.filter(p => p.status === "complete");
@@ -41,7 +37,7 @@ export default function ProductsPage() {
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !workshopId || !session?.user.id) return;
+    if (!file || !workshopId) return;
 
     setIsUploading(true);
     const toastId = toast.loading("Uploading and analyzing product...");
@@ -51,9 +47,8 @@ export default function ProductsPage() {
       const result = await createProject({
         name: "Analyzing Product...",
         workshopId,
-        userId: session.user.id
       });
-      const projectId = typeof result === 'string' ? (result as any) : result.id;
+      const projectId = typeof result === "string" ? result : result.id;
 
       // 2. Get upload URL
       const { uploadUrl, publicUrl } = await getUploadUrl({
@@ -101,11 +96,7 @@ export default function ProductsPage() {
   };
 
   return (
-    <SidebarProvider>
-      <div className="flex h-screen bg-neutral-950 text-white overflow-hidden font-sans w-full">
-        <AppSidebar />
-        
-        <SidebarInset className="flex-1 relative flex flex-col bg-neutral-950 border-none!">
+    <SidebarInset className="flex-1 relative flex flex-col bg-neutral-950 border-none!">
           <header className="h-14 border-b border-white/5 flex items-center justify-between px-6 bg-neutral-950/50 backdrop-blur-sm z-20">
             <div className="flex items-center gap-4">
               <span className="text-[10px] uppercase tracking-[0.2em] text-neutral-500 font-mono">Workspace</span>
@@ -170,9 +161,12 @@ export default function ProductsPage() {
                       {/* Product Image */}
                       <div className="aspect-square relative bg-neutral-900 overflow-hidden">
                         {project.imageUrl ? (
-                          <img 
+                          <Image
                             src={project.imageUrl} 
                             alt={project.name} 
+                            fill
+                            unoptimized
+                            sizes="(max-width: 768px) 100vw, 33vw"
                             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                           />
                         ) : (
@@ -253,8 +247,6 @@ export default function ProductsPage() {
               )}
             </div>
           </ScrollArea>
-        </SidebarInset>
-      </div>
-    </SidebarProvider>
+    </SidebarInset>
   );
 }

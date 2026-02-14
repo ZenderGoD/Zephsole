@@ -140,6 +140,7 @@ export interface CanvasItemData {
   content?: string;
   type?: string;
   imageUrl?: string;
+  source?: 'research' | 'studio';
   data?: Record<string, unknown>;
 }
 

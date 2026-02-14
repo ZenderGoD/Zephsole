@@ -1,28 +1,32 @@
 'use client';
 
 import { useState, use } from 'react';
-import { useRouter } from 'next/navigation';
 import { authClient } from '@/lib/auth-client';
-import { AppSidebar } from '@/components/app-sidebar';
-import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
+import { SidebarInset } from '@/components/ui/sidebar';
 import { useWorkshop } from '@/hooks/use-workshop';
 import { useQuery } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
 import { TechnicalBlueprint } from '@/components/studio/technical-blueprint';
-import { PencilRuler, LayoutGrid } from 'lucide-react';
+import { PencilRuler } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Id } from '../../../../convex/_generated/dataModel';
 
 export default function SchematicsPage({ params }: { params: Promise<{ workshopSlug: string }> }) {
-  const resolvedParams = use(params);
-  const router = useRouter();
+  use(params);
   const { data: session, isPending } = authClient.useSession();
   const { activeWorkshopId } = useWorkshop();
   
   const projects = useQuery(api.projects.getProjects, activeWorkshopId ? { workshopId: activeWorkshopId } : "skip");
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
 
-  const canvasItems = useQuery(api.studio.getCanvasItems, selectedProjectId ? { projectId: selectedProjectId as any } : "skip");
-  const project = useQuery(api.projects.getProject, selectedProjectId ? { id: selectedProjectId as any } : "skip");
+  const canvasItems = useQuery(
+    api.studio.getCanvasItems,
+    selectedProjectId ? { projectId: selectedProjectId as Id<"projects"> } : "skip",
+  );
+  const project = useQuery(
+    api.projects.getProject,
+    selectedProjectId ? { id: selectedProjectId as Id<"projects"> } : "skip",
+  );
 
   const blueprintItem = canvasItems?.find(item => item.type === 'technical-blueprint');
 
@@ -37,9 +41,7 @@ export default function SchematicsPage({ params }: { params: Promise<{ workshopS
   }
 
   return (
-    <SidebarProvider>
-      <div className="flex h-screen bg-background text-foreground overflow-hidden font-sans w-full">
-        <AppSidebar />
+    <div className="flex h-screen bg-background text-foreground overflow-hidden font-sans w-full">
         <SidebarInset className="flex-1 relative flex flex-col bg-background border-none!">
           <header className="h-14 border-b border-border flex items-center justify-between px-6 bg-background/50 backdrop-blur-sm z-20">
             <div className="flex items-center gap-4">
@@ -95,7 +97,7 @@ export default function SchematicsPage({ params }: { params: Promise<{ workshopS
                 </div>
                 <h2 className="text-xl font-bold text-white mb-2">No Schematics Generated</h2>
                 <p className="text-neutral-500 text-sm mb-8">
-                  This product doesn't have technical schematics yet. Use the Research tool to generate a blueprint first.
+                  This product doesn&apos;t have technical schematics yet. Use the Research tool to generate a blueprint first.
                 </p>
                 <button 
                   onClick={() => setSelectedProjectId(null)}
@@ -107,7 +109,6 @@ export default function SchematicsPage({ params }: { params: Promise<{ workshopS
             )}
           </div>
         </SidebarInset>
-      </div>
-    </SidebarProvider>
+    </div>
   );
 }

@@ -17,6 +17,7 @@ export function ImageGenerationState({
   children: (state: {
     status?: 'generating' | 'completed' | 'error';
     url?: string;
+    images?: Array<{ url: string; storageKey: string }>;
     model?: string;
     error?: string;
   } | undefined) => React.ReactNode;
@@ -35,6 +36,9 @@ export function ImageGenerationState({
         status: state.status,
         hasUrl: !!state.url,
         url: state.url?.substring(0, 50),
+        hasImages: !!state.images,
+        imageCount: state.images?.length ?? 0,
+        images: state.images,
         model: state.model,
         error: state.error,
         fullState: state,
@@ -46,12 +50,13 @@ export function ImageGenerationState({
     } else {
       console.log('[ImageGenerationState] No state found (query may be loading or no record exists) for toolCallId:', toolCallId);
     }
-  }, [state, toolCallId]);
+  }, [state, toolCallId, onComplete]);
   
   // Transform Convex document to the expected shape
   const transformedState = state ? {
     status: state.status,
     url: state.url,
+    images: state.images,
     model: state.model,
     error: state.error,
   } : undefined;

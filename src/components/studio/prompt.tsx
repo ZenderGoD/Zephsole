@@ -37,9 +37,11 @@ export function PromptInterface({ onGenerate, isGenerating, projectId, userId }:
   const getUploadUrl = useAction(api.mediaUploads.getUploadUrl);
   const saveMediaRecord = useMutation(api.media.saveMediaRecord);
 
+  // Allow submission when we have a prompt and aren't uploading
+  // isGenerating should only block when actually generating images, not when AI is asking questions
   const canSubmit = useMemo(
-    () => prompt.trim().length > 0 && !isGenerating && !isUploading,
-    [prompt, isGenerating, isUploading],
+    () => prompt.trim().length > 0 && !isUploading,
+    [prompt, isUploading],
   );
 
   const handleFileUpload = useCallback(
@@ -139,7 +141,7 @@ export function PromptInterface({ onGenerate, isGenerating, projectId, userId }:
             onChange={(e) => setPrompt(e.target.value)}
             placeholder="Upload a shoe, ask for schematics..."
             className="flex-1 bg-transparent border-none outline-none py-4 text-sm placeholder:text-muted-foreground/40 focus:ring-0 text-foreground font-medium"
-            disabled={isGenerating || isUploading}
+            disabled={isUploading}
           />
 
           <div className="flex items-center gap-2 pr-2">
@@ -158,7 +160,7 @@ export function PromptInterface({ onGenerate, isGenerating, projectId, userId }:
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading || isGenerating}
+              disabled={isUploading}
               className={cn(
                 "h-11 w-11 rounded-2xl flex items-center justify-center transition-all duration-300 border",
                 isUploading || isGenerating

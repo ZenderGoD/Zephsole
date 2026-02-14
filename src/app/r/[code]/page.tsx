@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 
-export default async function ReferralRedirect({ params }: { params: { code: string } }) {
-  const { code } = params;
+export default async function ReferralRedirect({ params }: { params: Promise<{ code: string }> }) {
+  const { code } = await params;
   
   const cookieStore = await cookies();
   cookieStore.set("referralCode", code, {
@@ -10,5 +10,5 @@ export default async function ReferralRedirect({ params }: { params: { code: str
     path: "/",
   });
 
-  redirect("/register");
+  redirect("/auth?mode=signup");
 }

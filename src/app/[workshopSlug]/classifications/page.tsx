@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { useWorkshop } from "@/hooks/use-workshop";
-import { Folder, Plus, MoreHorizontal, Pencil, Trash2, FolderPlus, LayoutGrid } from "lucide-react";
+import { Folder, Plus, MoreHorizontal, Pencil, Trash2, FolderPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { 
   DropdownMenu, 
@@ -12,10 +12,9 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { Id } from "../../../../convex/_generated/dataModel";
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/app-sidebar";
+import { SidebarInset } from "@/components/ui/sidebar";
 import {
   Dialog,
   DialogContent,
@@ -26,15 +25,14 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { H1, H3, P, Muted } from "@/components/ui/typography";
+import { H1, H3, P } from "@/components/ui/typography";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function ClassificationsPage() {
   const params = useParams();
   const workshopSlug = params.workshopSlug as string;
-  const router = useRouter();
-  
+
   const { activeWorkshopId } = useWorkshop();
   const workshop = useQuery(api.workshops.getWorkshopBySlug, { slug: workshopSlug });
   const workshopId = workshop?._id || activeWorkshopId;
@@ -121,10 +119,7 @@ export default function ClassificationsPage() {
   };
 
   return (
-    <SidebarProvider>
-      <div className="flex h-screen bg-neutral-950 text-white overflow-hidden font-sans w-full">
-        <AppSidebar />
-        
+    <>
         <SidebarInset className="flex-1 relative flex flex-col bg-neutral-950 border-none!">
           <header className="h-14 border-b border-white/5 flex items-center justify-between px-6 bg-neutral-950/50 backdrop-blur-sm z-20">
             <div className="flex items-center gap-4">
@@ -228,7 +223,7 @@ export default function ClassificationsPage() {
                           <H3 className="text-white font-semibold text-lg mb-1">{folder.name}</H3>
                           <div className="flex items-center gap-2">
                             <div className="flex -space-x-2">
-                              {folderProjects.slice(0, 3).map((p, i) => (
+                              {folderProjects.slice(0, 3).map((p) => (
                                 <div 
                                   key={p._id} 
                                   className="size-5 rounded-full bg-neutral-800 border-2 border-black flex items-center justify-center text-[8px] font-bold text-neutral-400"
@@ -256,7 +251,6 @@ export default function ClassificationsPage() {
             </div>
           </ScrollArea>
         </SidebarInset>
-      </div>
 
       {/* Create Folder Dialog */}
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
@@ -368,6 +362,6 @@ export default function ClassificationsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </SidebarProvider>
+    </>
   );
 }

@@ -21,12 +21,9 @@ export const backfillExistingWorkshopsWithGrants = mutation({
       // If workshop has no credits and no grants, or less than 5 and no grants
       if (totalGrantAmount === 0) {
         const amountToGrant = Math.max(existingCredits, 5); // Minimum 5 credits
-        await ctx.db.insert("creditGrants", {
+        await ctx.runMutation(internal.credits.grantCredits, {
           workshopId: workshop._id,
           amount: amountToGrant,
-          remaining: amountToGrant,
-          startsAt: Date.now(),
-          expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000, // 30 days
           source: "signup",
         });
         
@@ -34,12 +31,9 @@ export const backfillExistingWorkshopsWithGrants = mutation({
         count++;
       } else if (existingCredits > totalGrantAmount) {
         const diff = existingCredits - totalGrantAmount;
-        await ctx.db.insert("creditGrants", {
+        await ctx.runMutation(internal.credits.grantCredits, {
           workshopId: workshop._id,
           amount: diff,
-          remaining: diff,
-          startsAt: Date.now(),
-          expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000, 
           source: "backfill",
         });
         count++;

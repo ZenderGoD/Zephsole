@@ -6,6 +6,9 @@ import { action, internalMutation } from "./_generated/server";
 import { vWorkflowId, type WorkflowId } from "@convex-dev/workflow";
 import { vResultValidator } from "@convex-dev/workpool";
 
+const IMAGE_GENERATION_CREDIT_COST_BASIC = 0.2;
+const IMAGE_GENERATION_CREDIT_COST_PRO = 0.6;
+
 export const generateImage = workflow.define({
   args: {
     prompt: v.string(),
@@ -17,12 +20,17 @@ export const generateImage = workflow.define({
     workshopId: v.optional(v.id("workshops")),
     toolCallId: v.optional(v.string()), // Optional toolCallId for tracking
     source: v.optional(v.union(v.literal("research"), v.literal("studio"))),
+    numImages: v.optional(v.number()), // Number of images to generate (default: 4 for research, 1 for studio)
   },
   returns: v.object({
     url: v.string(),
     storageKey: v.string(),
     model: v.string(),
     prompt: v.string(),
+    images: v.optional(v.array(v.object({
+      url: v.string(),
+      storageKey: v.string(),
+    }))),
   }),
   handler: async (
     step,
@@ -32,6 +40,7 @@ export const generateImage = workflow.define({
     storageKey: string;
     model: string;
     prompt: string;
+    images?: Array<{ url: string; storageKey: string }>;
   }> => {
     console.log(`[generateImage workflow] 🚀🚀🚀 WORKFLOW HANDLER CALLED`, {
       timestamp: new Date().toISOString(),
@@ -75,63 +84,141 @@ export const generateImage = workflow.define({
 
     console.log(`[generateImage] 📐 Calculated dimensions: ${finalWidth}x${finalHeight}`);
 
-    // Step 2: Generate image using Fal.ai (main action)
+    // Step 2: Generate images using Fal.ai (parallel calls for diversity)
     console.log(`[generateImage workflow] 🔄 Step 2: Preparing to call generateImageWithFal action...`);
     let result;
     try {
       // Combine single and multiple reference images
       const referenceImageUrls = args.referenceImageUrls || (args.referenceImageUrl ? [args.referenceImageUrl] : []);
       
-      const actionArgs = {
-        prompt: args.prompt,
-        aspectRatio: aspectRatio,
-        referenceImageUrl: args.referenceImageUrl,
-        referenceImageUrls: referenceImageUrls.length > 0 ? referenceImageUrls : undefined,
-        width: finalWidth,
-        height: finalHeight,
-        projectId: args.projectId,
-        userId: args.userId,
-      };
+      const numImages = args.numImages ?? (args.source === "research" ? 4 : 1);
       
-      console.log(`[generateImage workflow] 📤 Calling generateImageWithFal action:`, {
-        promptLength: actionArgs.prompt.length,
-        promptPreview: actionArgs.prompt.substring(0, 100),
-        aspectRatio: actionArgs.aspectRatio,
-        hasReferenceImageUrl: !!actionArgs.referenceImageUrl,
-        hasReferenceImageUrls: !!actionArgs.referenceImageUrls,
-        referenceImageUrlsCount: actionArgs.referenceImageUrls?.length || 0,
-        width: actionArgs.width,
-        height: actionArgs.height,
-        hasProjectId: !!actionArgs.projectId,
-        projectIdValue: actionArgs.projectId,
-        hasUserId: !!actionArgs.userId,
-        userIdValue: actionArgs.userId,
-        fullActionArgs: JSON.stringify(actionArgs, null, 2),
-        apiImageGenerationExists: !!api.imageGeneration,
-        generateImageWithFalExists: !!api.imageGeneration?.generateImageWithFal,
-      });
-      
-      console.log(`[generateImage workflow] 📞 Calling step.runAction NOW...`);
-      result = await step.runAction(
-        api.imageGeneration.generateImageWithFal,
-        actionArgs,
-        {
-          name: "generateImageWithFal",
-          retry: { maxAttempts: 3, initialBackoffMs: 1000, base: 2 },
-        }
-      );
-      
-      console.log(`[generateImage workflow] ✅✅✅ Image generated successfully:`, {
-        hasResult: !!result,
-        resultType: typeof result,
-        resultKeys: result ? Object.keys(result) : [],
-        hasUrl: !!result?.url,
-        urlPreview: result?.url?.substring(0, 50),
-        model: result?.model,
-        storageKey: result?.storageKey,
-        prompt: result?.prompt?.substring(0, 50),
-        fullResult: JSON.stringify(result, null, 2),
-      });
+      // Make parallel calls for diversity (each call generates 1 image)
+      if (numImages > 1) {
+        console.log(`[generateImage workflow] 🚀 Making ${numImages} parallel API calls for diverse outputs...`);
+        
+        const actionArgsBase = {
+          prompt: args.prompt,
+          aspectRatio: aspectRatio,
+          referenceImageUrl: args.referenceImageUrl,
+          referenceImageUrls: referenceImageUrls.length > 0 ? referenceImageUrls : undefined,
+          width: finalWidth,
+          height: finalHeight,
+          projectId: args.projectId,
+          userId: args.userId,
+          numImages: 1, // Each call generates 1 image
+        };
+        
+        // Start all calls in parallel
+        const promises = Array.from({ length: numImages }, (_, i) => 
+          step.runAction(
+            api.imageGeneration.generateImageWithFal,
+            actionArgsBase,
+            {
+              name: `generateImageWithFal_${i + 1}`,
+              retry: { maxAttempts: 3, initialBackoffMs: 1000, base: 2 },
+            }
+          ) as Promise<{
+            url: string;
+            storageKey: string;
+            model: string;
+            prompt: string;
+            width: number;
+            height: number;
+            images?: Array<{ url: string; storageKey: string }>;
+          }>
+        );
+        
+        // Wait for all calls to complete
+        const results = await Promise.all(promises);
+        
+        console.log(`[generateImage workflow] ✅✅✅ All ${numImages} images generated successfully`);
+        
+        // Combine all images into a single result
+        const allImages: Array<{ url: string; storageKey: string }> = [];
+        results.forEach((res, idx) => {
+          if (res.images && res.images.length > 0) {
+            allImages.push(...res.images);
+          } else if (res.url) {
+            allImages.push({ url: res.url, storageKey: res.storageKey });
+          }
+          console.log(`[generateImage workflow] Call ${idx + 1}/${numImages} result:`, {
+            hasUrl: !!res.url,
+            imageCount: res.images?.length ?? 1,
+          });
+        });
+        
+        // Use first result as base, but replace images array with all combined images
+        result = {
+          ...results[0],
+          images: allImages,
+          url: allImages[0]?.url || results[0].url,
+          storageKey: allImages[0]?.storageKey || results[0].storageKey,
+        };
+        
+        console.log(`[generateImage workflow] Combined result:`, {
+          totalImages: allImages.length,
+          model: result.model,
+          hasUrl: !!result.url,
+        });
+      } else {
+        // Single image generation (original logic)
+        const actionArgs = {
+          prompt: args.prompt,
+          aspectRatio: aspectRatio,
+          referenceImageUrl: args.referenceImageUrl,
+          referenceImageUrls: referenceImageUrls.length > 0 ? referenceImageUrls : undefined,
+          width: finalWidth,
+          height: finalHeight,
+          projectId: args.projectId,
+          userId: args.userId,
+          numImages: 1,
+        };
+        
+        console.log(`[generateImage workflow] 📤 Calling generateImageWithFal action:`, {
+          promptLength: actionArgs.prompt.length,
+          promptPreview: actionArgs.prompt.substring(0, 100),
+          aspectRatio: actionArgs.aspectRatio,
+          hasReferenceImageUrl: !!actionArgs.referenceImageUrl,
+          hasReferenceImageUrls: !!actionArgs.referenceImageUrls,
+          referenceImageUrlsCount: actionArgs.referenceImageUrls?.length || 0,
+          width: actionArgs.width,
+          height: actionArgs.height,
+          hasProjectId: !!actionArgs.projectId,
+          projectIdValue: actionArgs.projectId,
+          hasUserId: !!actionArgs.userId,
+          userIdValue: actionArgs.userId,
+        });
+        
+        console.log(`[generateImage workflow] 📞 Calling step.runAction NOW...`);
+        result = await step.runAction(
+          api.imageGeneration.generateImageWithFal,
+          actionArgs,
+          {
+            name: "generateImageWithFal",
+            retry: { maxAttempts: 3, initialBackoffMs: 1000, base: 2 },
+          }
+        ) as {
+          url: string;
+          storageKey: string;
+          model: string;
+          prompt: string;
+          width: number;
+          height: number;
+          images?: Array<{ url: string; storageKey: string }>;
+        };
+        
+        console.log(`[generateImage workflow] ✅✅✅ Image generated successfully:`, {
+          hasResult: !!result,
+          resultType: typeof result,
+          resultKeys: result ? Object.keys(result) : [],
+          hasUrl: !!result?.url,
+          urlPreview: result?.url?.substring(0, 50),
+          model: result?.model,
+          storageKey: result?.storageKey,
+          prompt: result?.prompt?.substring(0, 50),
+        });
+      }
     } catch (error) {
       console.error(`[generateImage workflow] ❌❌❌ Image generation failed:`, {
         error: error instanceof Error ? error.message : String(error),
@@ -146,26 +233,29 @@ export const generateImage = workflow.define({
       throw error;
     }
 
-    // Step 3: Save to media table if projectId is provided (non-fatal)
-    if (args.projectId) {
-      try {
-        await step.runMutation(api.media.saveMediaRecord, {
-          projectId: args.projectId,
-          objectKey: result.storageKey,
-          fileName: `generated-${Date.now()}.png`,
-          contentType: "image/png",
-          kind: "generated",
-          uploadedBy: args.userId,
-        });
-        console.log(`[generateImage] 💾 Saved media record`, {
-          projectId: args.projectId,
-          storageKey: result.storageKey,
-        });
-      } catch (error) {
-        console.warn(`[generateImage] ⚠️ Failed to save media record (non-fatal):`, {
-          error: error instanceof Error ? error.message : String(error),
-        });
-        // Non-fatal, continue
+    // Step 3: Save all images to media table if projectId is provided (non-fatal)
+    if (args.projectId && result.images) {
+      for (let i = 0; i < result.images.length; i++) {
+        const img = result.images[i];
+        try {
+          await step.runMutation(api.media.saveMediaRecord, {
+            projectId: args.projectId,
+            objectKey: img.storageKey,
+            fileName: `generated-${Date.now()}-${i}.png`,
+            contentType: "image/png",
+            kind: "generated",
+            uploadedBy: args.userId,
+          });
+          console.log(`[generateImage] 💾 Saved media record ${i + 1}/${result.images.length}`, {
+            projectId: args.projectId,
+            storageKey: img.storageKey,
+          });
+        } catch (error) {
+          console.warn(`[generateImage] ⚠️ Failed to save media record ${i + 1} (non-fatal):`, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+          // Non-fatal, continue
+        }
       }
     }
 
@@ -183,11 +273,13 @@ export const generateImage = workflow.define({
           aspectRatio: args.aspectRatio,
           url: result.url,
           storageKey: result.storageKey,
+          images: result.images,
           model: result.model,
           source: args.source,
         });
         console.log(`[generateImage] ✅ Updated generation state to completed`, {
           toolCallId: args.toolCallId,
+          imageCount: result.images?.length ?? 1,
         });
       } catch (error) {
         console.warn(`[generateImage] ⚠️ Failed to update generation state (non-fatal):`, {
@@ -207,6 +299,7 @@ export const generateImage = workflow.define({
       storageKey: result.storageKey,
       model: result.model,
       prompt: args.prompt,
+      images: result.images,
     };
   },
 });
@@ -242,18 +335,22 @@ export const handleWorkflowComplete = internalMutation({
         storageKey?: string;
         model?: string;
         prompt?: string;
+        images?: Array<{ url: string; storageKey: string }>;
       };
       
       await ctx.db.patch(generation._id, {
         status: "completed",
         url: returnValue.url,
         storageKey: returnValue.storageKey,
+        images: returnValue.images,
         model: returnValue.model,
         completedAt: Date.now(),
       });
       console.log('[handleWorkflowComplete] Updated to completed state:', {
         toolCallId,
         url: returnValue.url,
+        imageCount: returnValue.images?.length ?? 0,
+        images: returnValue.images,
       });
     } else if (args.result.kind === "failed") {
       // Update to error state
@@ -292,6 +389,7 @@ export const startGenerateImage = action({
     userId: v.optional(v.string()),
     workshopId: v.optional(v.id("workshops")),
     source: v.optional(v.union(v.literal("research"), v.literal("studio"))),
+    numImages: v.optional(v.number()), // Number of images to generate (default: 4 for research, 1 for studio)
   },
   handler: async (ctx, args): Promise<{
     workflowId: string;
@@ -327,6 +425,28 @@ export const startGenerateImage = action({
       });
       throw new Error(errorMsg);
     }
+
+    // Charge credits before workflow launch, idempotent by toolCallId.
+    if (args.workshopId && args.toolCallId) {
+      const numImages = args.numImages ?? (args.source === "research" ? 4 : 1);
+      const baseImageCost =
+        (args.referenceImageUrls?.length ?? 0) > 0 || !!args.referenceImageUrl
+          ? IMAGE_GENERATION_CREDIT_COST_PRO
+          : IMAGE_GENERATION_CREDIT_COST_BASIC;
+      const totalCost = baseImageCost * numImages;
+      await ctx.runMutation(internal.credits.redeemCreditsInternal, {
+        workshopId: args.workshopId,
+        amount: totalCost,
+        projectId: args.projectId,
+        userId: args.userId,
+        assetType: "image",
+        usageContext: args.source === "research" ? "research" : "project_asset",
+        description: `Image generation (${args.source ?? "studio"}) - ${numImages} image${numImages > 1 ? "s" : ""}`,
+        refId: args.toolCallId,
+        ctcUsd: totalCost,
+        idempotencyKey: `image-gen:${args.toolCallId}`,
+      });
+    }
     
     console.log('[startGenerateImage] ✅ Validation passed, starting workflow...');
     
@@ -353,6 +473,7 @@ export const startGenerateImage = action({
           workshopId: args.workshopId,
           toolCallId: args.toolCallId,
           source: args.source,
+          numImages: args.numImages,
         },
         {
           onComplete: internal.imageWorkflow.handleWorkflowComplete,

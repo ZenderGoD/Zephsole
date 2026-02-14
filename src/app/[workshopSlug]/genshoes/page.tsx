@@ -3,9 +3,7 @@
 import { useState, useCallback, useMemo, useRef } from 'react';
 import { use } from 'react';
 import { useRouter } from 'next/navigation';
-import { authClient } from '@/lib/auth-client';
-import { AppSidebar } from '@/components/app-sidebar';
-import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
+import Image from 'next/image';
 import { useWorkshop } from '@/hooks/use-workshop';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
@@ -30,7 +28,6 @@ const fileToBase64 = (file: File) =>
 export default function GenShoesPage({ params }: { params: Promise<{ workshopSlug: string }> }) {
   const resolvedParams = use(params);
   const router = useRouter();
-  const { data: session } = authClient.useSession();
   const { activeWorkshopId } = useWorkshop();
   
   const [prompt, setPrompt] = useState('');
@@ -85,7 +82,7 @@ export default function GenShoesPage({ params }: { params: Promise<{ workshopSlu
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!canSubmit || !activeWorkshopId || !session?.user.id) return;
+    if (!canSubmit || !activeWorkshopId) return;
 
     setIsCreating(true);
     try {
@@ -105,7 +102,6 @@ export default function GenShoesPage({ params }: { params: Promise<{ workshopSlu
       const result = await createProjectMutation({
         name: prompt.trim().slice(0, 30) || 'New Design',
         workshopId: activeWorkshopId,
-        userId: session.user.id
       });
       const slug = typeof result === 'string' ? result : result.slug;
 
@@ -118,11 +114,7 @@ export default function GenShoesPage({ params }: { params: Promise<{ workshopSlu
   };
 
   return (
-    <SidebarProvider>
-      <div className="flex h-screen bg-background text-foreground overflow-hidden font-sans w-full">
-        <AppSidebar />
-        <SidebarInset className="flex-1 relative flex flex-col bg-background border-none!">
-          <div className="flex-1 relative bg-background overflow-hidden overflow-y-auto">
+    <div className="flex-1 relative bg-background overflow-hidden overflow-y-auto">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -227,9 +219,12 @@ export default function GenShoesPage({ params }: { params: Promise<{ workshopSlu
                               className="relative group"
                             >
                               <div className="w-20 h-20 rounded-2xl overflow-hidden border-2 border-white/10 bg-muted/50 shadow-xl">
-                                <img
+                                <Image
                                   src={attachment.base64 ? `data:${attachment.contentType};base64,${attachment.base64}` : attachment.url}
                                   alt={attachment.fileName}
+                                  width={80}
+                                  height={80}
+                                  unoptimized
                                   className="w-full h-full object-cover"
                                 />
                                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -279,9 +274,12 @@ export default function GenShoesPage({ params }: { params: Promise<{ workshopSlu
                           className="aspect-square rounded-2xl overflow-hidden border border-border bg-muted/30 group cursor-pointer hover:border-primary/50 transition-colors"
                           onClick={() => setPrompt(prev => prev ? `${prev}, inspired by ${asset.fileName.split('.')[0]}` : `Design inspired by ${asset.fileName.split('.')[0]}`)}
                         >
-                          <img 
+                          <Image
                             src={asset.url} 
                             alt={asset.fileName} 
+                            width={320}
+                            height={320}
+                            unoptimized
                             className="w-full h-full object-cover grayscale opacity-50 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-500"
                           />
                         </div>
@@ -291,9 +289,6 @@ export default function GenShoesPage({ params }: { params: Promise<{ workshopSlu
                 )}
               </div>
             </motion.div>
-          </div>
-        </SidebarInset>
-      </div>
-    </SidebarProvider>
+    </div>
   );
 }

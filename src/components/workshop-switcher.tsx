@@ -41,8 +41,14 @@ export function WorkshopSwitcher() {
     if (name) {
       setIsCreating(true);
       try {
-        const id = await createWorkshop({ name, ownerId: session.user.id });
+        const id = await createWorkshop({ name });
         setActiveWorkshopId(id as Id<"workshops">);
+        const created = workshops?.find((w) => w._id === id);
+        if (created?.slug) {
+          router.push(`/${created.slug}/research`);
+        } else {
+          router.push("/studio");
+        }
       } finally {
         setIsCreating(false);
       }
@@ -54,12 +60,18 @@ export function WorkshopSwitcher() {
     const email = prompt("Enter email to invite:");
     if (email) {
       try {
-        await inviteMember({ 
+        const result = await inviteMember({
           workshopId: activeWorkshopId, 
           email, 
           role: "member" 
         });
-        alert("Invited successfully!");
+        const inviteToken = (result as { token?: string })?.token;
+        if (inviteToken) {
+          const inviteUrl = `${window.location.origin}/auth/accept-invite?token=${inviteToken}`;
+          alert(`Invite created: ${inviteUrl}`);
+        } else {
+          alert("Invited successfully!");
+        }
       } catch (e) {
         const errorMessage = e instanceof Error ? e.message : 'Failed to invite member';
         alert(errorMessage);
@@ -93,7 +105,7 @@ export function WorkshopSwitcher() {
             key={workshop._id}
             onSelect={() => {
               setActiveWorkshopId(workshop._id);
-              router.push("/studio");
+              router.push(`/${workshop.slug}/research`);
             }}
             className="flex items-center justify-between cursor-pointer"
           >

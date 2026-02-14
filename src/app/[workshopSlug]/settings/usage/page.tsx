@@ -23,6 +23,10 @@ export default function UsagePage() {
     api.credits.getAvailableCredits,
     activeWorkshopId ? { workshopId: activeWorkshopId } : "skip"
   );
+  const creditStatus = useQuery(
+    api.credits.getCreditStatus,
+    activeWorkshopId ? { workshopId: activeWorkshopId } : "skip",
+  );
 
   const redemptions = useQuery(
     api.credits.listRedemptions,
@@ -67,6 +71,22 @@ export default function UsagePage() {
             <div className="text-5xl font-light tracking-tighter">
               {creditBalance?.balance !== undefined ? creditBalance.balance.toLocaleString() : "..."}
             </div>
+            {creditStatus?.status && (
+              <div className="mt-3">
+                <span className="text-[10px] uppercase tracking-widest text-neutral-500">Status: </span>
+                <span
+                  className={
+                    creditStatus.status === "healthy"
+                      ? "text-emerald-400 text-[10px] uppercase tracking-widest font-bold"
+                      : creditStatus.status === "low"
+                        ? "text-amber-400 text-[10px] uppercase tracking-widest font-bold"
+                        : "text-red-400 text-[10px] uppercase tracking-widest font-bold"
+                  }
+                >
+                  {creditStatus.status}
+                </span>
+              </div>
+            )}
           </div>
           <div className="text-right">
             <p className="text-[10px] text-neutral-500 uppercase tracking-widest mb-1">Current Workshop</p>

@@ -1,13 +1,11 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { authComponent } from "./auth";
-import { GenericQueryCtx, GenericDataModel } from "convex/server";
+import { requireAuthUserId, requireWorkshopMember } from "./authUtils";
 
 export const getMessages = query({
   args: { projectId: v.id("projects") },
   handler: async (ctx, args) => {
-    const user = await authComponent.safeGetAuthUser(ctx);
-    if (!user) return [];
+    const userId = await requireAuthUserId(ctx);
 
     const project = await ctx.db.get(args.projectId);
     if (!project) return [];
@@ -16,7 +14,7 @@ export const getMessages = query({
     const membership = await ctx.db
       .query("workshopMembers")
       .withIndex("by_workshop_user", (q) => 
-        q.eq("workshopId", project.workshopId).eq("userId", user._id)
+        q.eq("workshopId", project.workshopId).eq("userId", userId)
       )
       .first();
 
@@ -47,6 +45,11 @@ export const sendMessage = mutation({
     }))),
   },
   handler: async (ctx, args) => {
+    await requireAuthUserId(ctx);
+    const project = await ctx.db.get(args.projectId);
+    if (!project) throw new Error("Project not found");
+    await requireWorkshopMember(ctx, project.workshopId);
+
     const insertedId = await ctx.db.insert("intelligenceThreads", {
       projectId: args.projectId,
       role: args.role,
@@ -68,9 +71,58 @@ export const sendMessage = mutation({
   },
 });
 
+export const updateMessageAttachments = mutation({
+  args: {
+    messageId: v.string(), // useChat message ID
+    projectId: v.id("projects"),
+    attachments: v.array(v.object({
+      mediaId: v.optional(v.id("media")),
+      url: v.string(),
+      fileName: v.string(),
+      contentType: v.string(),
+      size: v.optional(v.number()),
+    })),
+  },
+  handler: async (ctx, args) => {
+    await requireAuthUserId(ctx);
+    const project = await ctx.db.get(args.projectId);
+    if (!project) throw new Error("Project not found");
+    await requireWorkshopMember(ctx, project.workshopId);
+
+    // Find message by messageId
+    const message = await ctx.db
+      .query("intelligenceThreads")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .filter((q) => q.eq(q.field("messageId"), args.messageId))
+      .first();
+
+    if (!message) {
+      console.warn(`[updateMessageAttachments] Message not found: ${args.messageId}`);
+      return;
+    }
+
+    // Merge new attachments with existing ones (avoid duplicates)
+    const existingAttachments = message.attachments || [];
+    const existingUrls = new Set(existingAttachments.map(a => a.url));
+    const newAttachments = args.attachments.filter(a => !existingUrls.has(a.url));
+    
+    await ctx.db.patch(message._id, {
+      attachments: [...existingAttachments, ...newAttachments],
+    });
+
+    await ctx.db.patch(args.projectId, { lastUpdated: Date.now() });
+    return message._id;
+  },
+});
+
 export const clearHistory = mutation({
   args: { projectId: v.id("projects") },
   handler: async (ctx, args) => {
+    await requireAuthUserId(ctx);
+    const project = await ctx.db.get(args.projectId);
+    if (!project) return;
+    await requireWorkshopMember(ctx, project.workshopId);
+
     const messages = await ctx.db
       .query("intelligenceThreads")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))

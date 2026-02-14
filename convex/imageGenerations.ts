@@ -1,6 +1,20 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { Id } from "./_generated/dataModel";
+import { Id, Doc } from "./_generated/dataModel";
+
+type ImageGenerationUpdateData = {
+  status: "generating" | "completed" | "error";
+  prompt?: string;
+  aspectRatio?: string;
+  url?: string;
+  storageKey?: string;
+  images?: Array<{ url: string; storageKey: string }>;
+  model?: string;
+  error?: string;
+  workflowId?: string;
+  source?: "research" | "studio";
+  completedAt?: number;
+};
 
 /**
  * Create or update image generation state
@@ -20,6 +34,10 @@ export const upsertGeneration = mutation({
     aspectRatio: v.optional(v.string()),
     url: v.optional(v.string()),
     storageKey: v.optional(v.string()),
+    images: v.optional(v.array(v.object({
+      url: v.string(),
+      storageKey: v.string(),
+    }))),
     model: v.optional(v.string()),
     error: v.optional(v.string()),
     source: v.optional(v.union(v.literal("research"), v.literal("studio"))),
@@ -32,12 +50,13 @@ export const upsertGeneration = mutation({
       .first();
 
     const now = Date.now();
-    const updateData: any = {
+    const updateData: ImageGenerationUpdateData = {
       status: args.status,
       ...(args.prompt !== undefined && { prompt: args.prompt }),
       ...(args.aspectRatio !== undefined && { aspectRatio: args.aspectRatio }),
       ...(args.url !== undefined && { url: args.url }),
       ...(args.storageKey !== undefined && { storageKey: args.storageKey }),
+      ...(args.images !== undefined && { images: args.images }),
       ...(args.model !== undefined && { model: args.model }),
       ...(args.error !== undefined && { error: args.error }),
       ...(args.workflowId !== undefined && { workflowId: args.workflowId }),
@@ -61,6 +80,7 @@ export const upsertGeneration = mutation({
         aspectRatio: args.aspectRatio,
         url: args.url,
         storageKey: args.storageKey,
+        images: args.images,
         model: args.model,
         error: args.error,
         source: args.source,
@@ -108,5 +128,25 @@ export const getGenerationByWorkflowId = query({
       .query("imageGenerations")
       .withIndex("by_workflowId", (q) => q.eq("workflowId", args.workflowId))
       .first();
+  },
+});
+
+/**
+ * Get generations by multiple toolCallIds
+ */
+export const getGenerationsByToolCallIds = query({
+  args: { toolCallIds: v.array(v.string()) },
+  handler: async (ctx, args) => {
+    if (args.toolCallIds.length === 0) return [];
+    
+    const results = [];
+    for (const toolCallId of args.toolCallIds) {
+      const gen = await ctx.db
+        .query("imageGenerations")
+        .withIndex("by_toolCallId", (q) => q.eq("toolCallId", toolCallId))
+        .first();
+      if (gen) results.push(gen);
+    }
+    return results;
   },
 });

@@ -3,39 +3,38 @@
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { authClient } from '@/lib/auth-client';
-import { AppSidebar } from '@/components/app-sidebar';
 import { GenerationCanvas } from '@/components/studio/canvas';
 import { ResearchChat } from '@/components/studio/research-chat';
 import { PromptInterface } from '@/components/studio/prompt';
-import { ParameterPanel } from '@/components/studio/parameters';
 import { cn } from '@/lib/utils';
-import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
+import { SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { useWorkshop } from '@/hooks/use-workshop';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../../../convex/_generated/api';
-import { GenMode, WorkspaceMode, PromptPayload, SendToCanvasArgs, RequestTechnicalBlueprintArgs } from '@/lib/types';
+import { GenMode, PromptPayload, SendToCanvasArgs, RequestTechnicalBlueprintArgs } from '@/lib/types';
 import { Id } from '../../../../../convex/_generated/dataModel';
-import { BarChart3 } from 'lucide-react';
+import { PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export default function ProjectPage({ params }: { params: Promise<{ workshopSlug: string, projectSlug: string }> }) {
   const resolvedParams = use(params);
   console.log('Resolved Params:', resolvedParams);
 
-  const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>('research');
   const [mode] = useState<GenMode>('research');
   const [isGenerating, setIsGenerating] = useState(false);
   const [currentPrompt, setCurrentPrompt] = useState<PromptPayload | null>(null);
-  const [showAnalytics, setShowAnalytics] = useState(false);
+  const [showCanvas, setShowCanvas] = useState(false);
 
   const router = useRouter();
   const { data: session, isPending } = authClient.useSession();
   const { setActiveWorkshopId, workshops } = useWorkshop();
 
   useEffect(() => {
-    const handleSwitchMode = (e: any) => {
-      if (e.detail === 'research' || e.detail === 'studio') {
-        setWorkspaceMode(e.detail);
+    const handleSwitchMode = (e: Event) => {
+      const detail = (e as CustomEvent<'research' | 'studio'>).detail;
+      if (detail === 'studio') {
+        setShowCanvas(true);
       }
     };
     window.addEventListener('switch-workspace-mode', handleSwitchMode);
@@ -43,7 +42,7 @@ export default function ProjectPage({ params }: { params: Promise<{ workshopSlug
   }, []);
 
   const project = useQuery(api.projects.getProjectBySlug, 
-    resolvedParams.workshopSlug && resolvedParams.projectSlug 
+    !isPending && session && resolvedParams.workshopSlug && resolvedParams.projectSlug 
       ? {
           workshopSlug: resolvedParams.workshopSlug,
           projectSlug: resolvedParams.projectSlug
@@ -56,7 +55,30 @@ export default function ProjectPage({ params }: { params: Promise<{ workshopSlug
   const canvasItems = useQuery(api.studio.getCanvasItems, projectId ? { projectId } : "skip");
   const addCanvasItem = useMutation(api.studio.addCanvasItem);
   const updateCanvasItemPosition = useMutation(api.studio.updateCanvasItemPosition);
-  const renameProject = useMutation(api.projects.renameProject);
+  const renameProject = useMutation(api.projects.renameProject).withOptimisticUpdate(
+    (localStore, args) => {
+      const currentProject = localStore.getQuery(api.projects.getProjectBySlug, {
+        workshopSlug: resolvedParams.workshopSlug,
+        projectSlug: resolvedParams.projectSlug,
+      });
+      if (currentProject !== undefined && currentProject !== null) {
+        localStore.setQuery(
+          api.projects.getProjectBySlug,
+          {
+            workshopSlug: resolvedParams.workshopSlug,
+            projectSlug: resolvedParams.projectSlug,
+          },
+          {
+            ...currentProject,
+            name: args.name,
+            lastUpdated: Date.now(),
+            messageQueue: currentProject.messageQueue || [],
+            threadStatus: currentProject.threadStatus || "idle",
+          }
+        );
+      }
+    }
+  );
   const dequeueMessage = useMutation(api.projects.dequeueMessage);
 
   const [isRenaming, setIsRenaming] = useState(false);
@@ -102,11 +124,13 @@ export default function ProjectPage({ params }: { params: Promise<{ workshopSlug
       y: Math.random() * 400 - 200
     });
     
-    setWorkspaceMode('studio');
+    setShowCanvas(true);
   };
 
   const handleGenerateBlueprint = async (data: RequestTechnicalBlueprintArgs) => {
-    const imageUrl = data.imageUrls && data.imageUrls.length > 0 ? data.imageUrls[0] : (data as any).imageUrl || '';
+    const legacyImageUrl = (data as { imageUrl?: string }).imageUrl;
+    const imageUrl =
+      data.imageUrls && data.imageUrls.length > 0 ? data.imageUrls[0] : legacyImageUrl || '';
     if (!projectId) return;
 
     setIsGenerating(true);
@@ -146,7 +170,7 @@ export default function ProjectPage({ params }: { params: Promise<{ workshopSlug
     });
 
     setIsGenerating(false);
-    setWorkspaceMode('studio');
+    setShowCanvas(true);
   };
 
   const handleItemMove = async (id: Id<"canvasItems"> | string, x: number, y: number) => {
@@ -168,7 +192,7 @@ export default function ProjectPage({ params }: { params: Promise<{ workshopSlug
 
   useEffect(() => {
     if (!isPending && !session) {
-      router.push('/login');
+      router.push('/auth?mode=signin');
     }
   }, [session, isPending, router]);
 
@@ -244,16 +268,12 @@ export default function ProjectPage({ params }: { params: Promise<{ workshopSlug
   }
 
   return (
-    <SidebarProvider>
-      <div className="flex h-screen bg-background text-foreground overflow-hidden font-sans w-full">
-        {/* Studio Sidebar */}
-        <AppSidebar />
-
-        {/* Main Studio Area */}
+    <div className="flex h-screen bg-background text-foreground overflow-hidden font-sans w-full">
         <SidebarInset className="flex-1 relative flex flex-col bg-background border-none!">
           {/* Top bar info */}
           <header className="h-14 border-b border-border flex items-center justify-between px-6 bg-background/50 backdrop-blur-sm z-20">
             <div className="flex items-center gap-4">
+              <SidebarTrigger className="mr-1" />
               <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground font-mono">Workshop</span>
               <span className="text-xs font-medium">{activeWorkshop?.name || 'Loading...'}</span>
               <span className="text-muted-foreground/30">/</span>
@@ -280,33 +300,18 @@ export default function ProjectPage({ params }: { params: Promise<{ workshopSlug
               )}
             </div>
 
-            {/* Workspace Mode Toggle */}
-            <div className="absolute left-1/2 -translate-x-1/2 flex items-center bg-muted border border-border rounded-full p-1 shadow-inner">
-              <button
-                onClick={() => setWorkspaceMode('research')}
-                className={cn(
-                  "px-4 py-1.5 rounded-full text-[10px] uppercase font-bold tracking-[0.2em] transition-all",
-                  workspaceMode === 'research' 
-                    ? "bg-background text-foreground shadow-lg" 
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                Research
-              </button>
-              <button
-                onClick={() => setWorkspaceMode('studio')}
-                className={cn(
-                  "px-4 py-1.5 rounded-full text-[10px] uppercase font-bold tracking-[0.2em] transition-all",
-                  workspaceMode === 'studio' 
-                    ? "bg-background text-foreground shadow-lg" 
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                Studio
-              </button>
-            </div>
-
             <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowCanvas((prev) => !prev)}
+                className={cn(
+                  "h-8 w-8 transition-colors",
+                  showCanvas ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {showCanvas ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
+              </Button>
               <div className={cn(
                 "w-2 h-2 rounded-full",
                 isGenerating ? "bg-orange-500 animate-pulse" : "bg-emerald-500"
@@ -314,67 +319,92 @@ export default function ProjectPage({ params }: { params: Promise<{ workshopSlug
               <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-mono mr-2">
                 {isGenerating ? 'AI Generating...' : 'System Ready'}
               </span>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setShowAnalytics(!showAnalytics)}
-                className={cn(
-                  "h-8 w-8 transition-colors",
-                  showAnalytics ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"
-                )}
-              >
-                <BarChart3 className="h-4 w-4" />
-              </Button>
             </div>
           </header>
 
-          {/* 3D/2D Viewport or Research Chat */}
+          {/* Research + toggleable canvas */}
           <div className="flex-1 relative bg-background overflow-hidden">
-            {workspaceMode === 'studio' ? (
-              <GenerationCanvas 
-                mode={mode} 
-                isGenerating={isGenerating} 
-                items={canvasItems}
-                onItemMove={handleItemMove}
-              />
+            {showCanvas ? (
+              <ResizablePanelGroup direction="horizontal" className="h-full w-full">
+                <ResizablePanel defaultSize={54} minSize={35}>
+                  <div className="relative h-full overflow-hidden">
+                    <ResearchChat 
+                      key={project?._id} // Force remount when project changes
+                      onSendToCanvas={handleSendToCanvas}
+                      onGenerateBlueprint={handleGenerateBlueprint}
+                      pendingMessage={currentPrompt || undefined}
+                      isGenerating={isGenerating}
+                      onGenerationComplete={handleGenerationComplete}
+                      onProcessingStart={() => setIsGenerating(true)}
+                      onMessageConsumed={() => setCurrentPrompt(null)}
+                      projectId={project?._id}
+                      projectContext={{
+                        projectName: resolvedParams.projectSlug,
+                        workshopName: resolvedParams.workshopSlug,
+                        status: project?.status,
+                      }}
+                    />
+                    {/* Prompt Overlay - fixed in chat area */}
+                    <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-full max-w-2xl px-6 z-30 pointer-events-none">
+                      <div className="pointer-events-auto">
+                        <PromptInterface 
+                          projectId={project?._id}
+                          userId={session?.user?.id}
+                          onGenerate={(payload) => {
+                            setCurrentPrompt(payload);
+                          }} 
+                          isGenerating={false} 
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </ResizablePanel>
+                <ResizableHandle withHandle />
+                <ResizablePanel defaultSize={46} minSize={30}>
+                  <div className="relative h-full overflow-hidden">
+                    <GenerationCanvas 
+                      mode={mode} 
+                      isGenerating={isGenerating} 
+                      items={canvasItems}
+                      onItemMove={handleItemMove}
+                    />
+                  </div>
+                </ResizablePanel>
+              </ResizablePanelGroup>
             ) : (
-              <ResearchChat 
-                key={project?._id} // Force remount when project changes
-                onSendToCanvas={handleSendToCanvas}
-                onGenerateBlueprint={handleGenerateBlueprint}
-                pendingMessage={currentPrompt || undefined}
-                isGenerating={isGenerating}
-                onGenerationComplete={handleGenerationComplete}
-                onProcessingStart={() => setIsGenerating(true)}
-                onMessageConsumed={() => setCurrentPrompt(null)}
-                projectId={project?._id}
-                projectContext={{
-                  projectName: resolvedParams.projectSlug,
-                  workshopName: resolvedParams.workshopSlug,
-                  status: project?.status,
-                }}
-              />
-            )}
-            
-            {/* Prompt Overlay - Fixed at bottom */}
-            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-full max-w-2xl px-6 z-30 pointer-events-none">
-              <div className="pointer-events-auto">
-                <PromptInterface 
+              <div className="relative h-full overflow-hidden">
+                <ResearchChat 
+                  key={project?._id}
+                  onSendToCanvas={handleSendToCanvas}
+                  onGenerateBlueprint={handleGenerateBlueprint}
+                  pendingMessage={currentPrompt || undefined}
+                  isGenerating={isGenerating}
+                  onGenerationComplete={handleGenerationComplete}
+                  onProcessingStart={() => setIsGenerating(true)}
+                  onMessageConsumed={() => setCurrentPrompt(null)}
                   projectId={project?._id}
-                  userId={session?.user?.id}
-                  onGenerate={(payload) => {
-                    setCurrentPrompt(payload);
-                  }} 
-                  isGenerating={isGenerating} 
+                  projectContext={{
+                    projectName: resolvedParams.projectSlug,
+                    workshopName: resolvedParams.workshopSlug,
+                    status: project?.status,
+                  }}
                 />
+                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-full max-w-2xl px-6 z-30 pointer-events-none">
+                  <div className="pointer-events-auto">
+                    <PromptInterface 
+                      projectId={project?._id}
+                      userId={session?.user?.id}
+                      onGenerate={(payload) => {
+                        setCurrentPrompt(payload);
+                      }} 
+                      isGenerating={false} 
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </SidebarInset>
-
-        {/* Parameter Panel */}
-        {showAnalytics && <ParameterPanel mode={mode} projectId={project?._id} />}
-      </div>
-    </SidebarProvider>
+    </div>
   );
 }

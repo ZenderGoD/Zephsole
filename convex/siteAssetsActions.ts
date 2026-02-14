@@ -5,6 +5,7 @@ import { v } from "convex/values";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { randomUUID } from "crypto";
+import { isAdminUser, requireAuthUserId } from "./authUtils";
 
 const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
 
@@ -43,7 +44,11 @@ export const getUploadUrl = action({
     contentType: v.string(),
     size: v.optional(v.number()),
   },
-  handler: async (_ctx, args) => {
+  handler: async (ctx, args) => {
+    await requireAuthUserId(ctx);
+    const admin = await isAdminUser(ctx);
+    if (!admin) throw new Error("ADMIN_ONLY");
+
     const bucket = requiredEnv("R2_BUCKET_NAME");
     const { client, accountId } = createR2Client();
 

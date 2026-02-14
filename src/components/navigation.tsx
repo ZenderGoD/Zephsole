@@ -13,8 +13,27 @@ export function Navigation() {
   const { data: session } = authClient.useSession();
 
   const isHome = pathname === '/';
-  const isAuth = pathname === '/login' || pathname === '/register';
-  const isStudio = pathname?.includes('/threads/') || pathname?.includes('/genshoes') || pathname === '/studio';
+  const isAuth = pathname === "/auth" || pathname === "/login" || pathname === "/register";
+  const segments = pathname.split("/").filter(Boolean);
+  const blockedRoots = new Set([
+    "auth",
+    "api",
+    "login",
+    "register",
+    "settings",
+    "studio",
+    "admin",
+    "r",
+    "pricing",
+    "showcase",
+    "contact",
+  ]);
+  const isWorkshopScopedRoute = segments.length > 1 && !blockedRoots.has(segments[0]);
+  const isStudio =
+    pathname?.includes('/threads/') ||
+    pathname?.includes('/genshoes') ||
+    pathname === '/studio' ||
+    isWorkshopScopedRoute;
   const isAdmin = pathname === '/admin';
 
   if (isAuth || isStudio || isAdmin) return null;
@@ -32,7 +51,7 @@ export function Navigation() {
   return (
     <>
       {/* Auth Link */}
-      <div className="fixed top-6 right-6 z-[100] flex gap-3">
+      <div className="fixed top-6 right-6 z-100 flex gap-3">
         {session ? (
           <Link 
             href="/studio"
@@ -43,13 +62,13 @@ export function Navigation() {
         ) : (
           <>
             <Link 
-              href="/login"
+              href="/auth?mode=signin"
               className="text-muted-foreground hover:text-foreground px-4 py-1.5 rounded-full text-xs font-medium transition-colors bg-background/50 backdrop-blur-md border border-border"
             >
               Sign In
             </Link>
             <Link 
-              href="/register"
+              href="/auth?mode=signup"
               className="bg-primary text-primary-foreground px-4 py-1.5 rounded-full text-xs font-medium hover:bg-primary/90 transition-colors shadow-lg"
             >
               Sign Up
@@ -59,7 +78,7 @@ export function Navigation() {
       </div>
 
       {/* Main Navigation */}
-      <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] flex items-center bg-background/50 backdrop-blur-md p-1 rounded-full border border-border shadow-lg">
+      <div className="fixed top-6 left-1/2 -translate-x-1/2 z-100 flex items-center bg-background/50 backdrop-blur-md p-1 rounded-full border border-border shadow-lg">
         <button
           onClick={() => handleTabChange('gallery')}
           className={cn(

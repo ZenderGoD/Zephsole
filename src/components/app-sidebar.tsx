@@ -1,72 +1,50 @@
 "use client";
 
-import { useState } from "react";
-import { 
-  Search, 
-  Sparkles, 
-  PencilRuler, 
-  Beaker, 
-  LogOut, 
-  Box,
+import { useMemo, useEffect } from "react";
+import {
+  Search,
+  LogOut,
+  Moon,
+  Sun,
   Plus,
-  Users,
-  Layers,
-  History,
-  LayoutGrid,
   MoreHorizontal,
-  Pencil,
   Pin,
   PinOff,
   Trash2,
-  Tag,
-  Check,
-  ChevronDown,
-  User,
-  Sun,
-  Moon,
-  CreditCard,
-  Activity
+  FolderPlus,
+  Folder,
 } from "lucide-react";
-import { 
-  Sidebar, 
-  SidebarContent, 
-  SidebarFooter, 
-  SidebarHeader, 
-  SidebarMenu, 
-  SidebarMenuButton, 
-  SidebarMenuItem,
-  SidebarMenuAction,
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarMenuAction,
 } from "@/components/ui/sidebar";
 import { authClient } from "@/lib/auth-client";
-import { useRouter, usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useTheme } from "next-themes";
 import { WorkshopSwitcher } from "@/components/workshop-switcher";
 import { useWorkshop } from "@/hooks/use-workshop";
+import { cn } from "@/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { cn } from "@/lib/utils";
 import { Id } from "../../convex/_generated/dataModel";
-import { Skeleton } from "@/components/ui/skeleton";
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuLabel, 
-  DropdownMenuSeparator, 
-  DropdownMenuTrigger 
-} from "@/components/ui/dropdown-menu";
-
-const items = [
-  { id: "genshoes", title: "GenShoes", icon: Sparkles },
-  { id: "research", title: "Research", icon: Search },
-  { id: "schematics", title: "Schematics", icon: PencilRuler },
-  { id: "marketing", title: "Marketing", icon: Layers },
-  { id: "products", title: "Products", icon: Box },
-];
 
 export function AppSidebar() {
   const router = useRouter();
@@ -75,43 +53,57 @@ export function AppSidebar() {
   const { activeWorkshopId, activeWorkshopSlug } = useWorkshop();
   const { setTheme, theme } = useTheme();
 
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
-    navigation: true,
-    projects: true,
-    workspace: true,
-  });
-
-  const toggleGroup = (group: string) => {
-    setExpandedGroups((prev) => ({ ...prev, [group]: !prev[group] }));
-  };
-  
+  const createProject = useMutation(api.projects.createProject);
   const deleteProject = useMutation(api.projects.deleteProject);
-  const renameProject = useMutation(api.projects.renameProject);
   const togglePinProject = useMutation(api.projects.togglePinProject);
   const updateClassification = useMutation(api.projects.updateProjectClassification);
   const createClassification = useMutation(api.projects.createClassification);
+
+  const projects = useQuery(
+    api.projects.getProjects,
+    activeWorkshopId ? { workshopId: activeWorkshopId } : "skip",
+  );
+  const classifications = useQuery(
+    api.projects.getClassifications,
+    activeWorkshopId ? { workshopId: activeWorkshopId } : "skip",
+  );
+
+  const chats = useMemo(() => projects ?? [], [projects]);
   
-  const projects = useQuery(api.projects.getProjects, activeWorkshopId ? { workshopId: activeWorkshopId } : "skip");
-  const classifications = useQuery(api.projects.getClassifications, activeWorkshopId ? { workshopId: activeWorkshopId } : "skip");
+  // Debug logging
+  useEffect(() => {
+    console.log('[AppSidebar] Projects state:', {
+      activeWorkshopId,
+      activeWorkshopSlug,
+      projects,
+      projectsLength: projects?.length ?? 0,
+      chatsLength: chats.length,
+    });
+  }, [activeWorkshopId, activeWorkshopSlug, projects, chats.length]);
 
-  const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
-  const [editingName, setEditingName] = useState("");
-
-  const handleStartRename = (project: { _id: string; name: string }) => {
-    setEditingProjectId(project._id);
-    setEditingName(project.name);
+  const handleCreateChat = async () => {
+    if (!activeWorkshopId || !activeWorkshopSlug) return;
+    const result = await createProject({
+      name: "New Chat",
+      workshopId: activeWorkshopId,
+    });
+    const slug = typeof result === "string" ? result : result.slug;
+    router.push(`/${activeWorkshopSlug}/threads/${slug}`);
   };
 
-  const handleSubmitRename = async () => {
-    if (!editingProjectId || !editingName.trim()) return;
-    await renameProject({ id: editingProjectId as Id<"projects">, name: editingName.trim() });
-    setEditingProjectId(null);
+  const handleCreateFolder = async () => {
+    if (!activeWorkshopId) return;
+    const name = prompt("Folder name:");
+    if (!name?.trim()) return;
+    const colors = ["#f87171", "#fb923c", "#fbbf24", "#4ade80", "#22d3ee", "#818cf8", "#c084fc"];
+    await createClassification({
+      workshopId: activeWorkshopId,
+      name: name.trim(),
+      color: colors[Math.floor(Math.random() * colors.length)],
+    });
   };
 
-  const handleCreateProject = async () => {
-    if (!activeWorkshopSlug) return;
-    router.push(`/${activeWorkshopSlug}/genshoes`);
-  };
+  const chatHref = activeWorkshopSlug ? `/${activeWorkshopSlug}/research` : "#";
 
   return (
     <Sidebar collapsible="icon" className="border-r border-border">
@@ -120,198 +112,138 @@ export function AppSidebar() {
           <WorkshopSwitcher />
         </div>
       </SidebarHeader>
-      <SidebarContent className="py-4 space-y-6" data-lenis-prevent>
-        {/* Actions Group */}
+
+      <SidebarContent className="py-4" data-lenis-prevent>
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton 
-                  onClick={handleCreateProject}
-                  tooltip="New Design"
-                  className="bg-primary text-primary-foreground hover:bg-primary/90 transition-all font-bold"
+                <SidebarMenuButton
+                  onClick={handleCreateChat}
+                  tooltip="New Chat"
+                  className="bg-primary text-primary-foreground hover:bg-primary/90"
                 >
                   <Plus className="size-4" />
-                  <span className="text-xs uppercase tracking-widest">New Design</span>
+                  <span className="text-xs font-semibold">New Chat</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  onClick={() => activeWorkshopSlug && router.push(chatHref)}
+                  isActive={pathname === chatHref}
+                  tooltip="Chat"
+                  className={cn(
+                    "hover:bg-accent transition-all",
+                    pathname === chatHref ? "bg-primary text-primary-foreground hover:bg-primary/90" : "text-muted-foreground",
+                  )}
+                >
+                  <Search className="size-4" />
+                  <span className="text-xs font-medium">Chat</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* Navigation Group */}
         <SidebarGroup>
-          <SidebarGroupLabel 
-            className="text-[10px] uppercase tracking-widest text-neutral-500 px-4 mb-2 cursor-pointer hover:text-white transition-colors flex items-center justify-between"
-            onClick={() => toggleGroup('navigation')}
-          >
-            Navigation
-            <ChevronDown className={cn("size-3 transition-transform duration-200", !expandedGroups.navigation && "-rotate-90")} />
+          <SidebarGroupLabel className="px-4 text-[10px] uppercase tracking-widest text-muted-foreground">
+            Chats
           </SidebarGroupLabel>
-          {expandedGroups.navigation && (
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {items.map((item) => {
-                  const url = `/${activeWorkshopSlug}/${item.id}`;
-                  const isActive = pathname === url;
-                  return (
-                    <SidebarMenuItem key={item.id}>
-                      <SidebarMenuButton 
-                        isActive={isActive}
-                        onClick={() => router.push(url)}
-                        tooltip={item.title}
-                        className={cn(
-                          "hover:bg-accent transition-all",
-                          isActive ? "bg-primary text-primary-foreground hover:bg-primary/90" : "text-muted-foreground"
-                        )}
-                      >
-                        <item.icon className="size-4" />
-                        <span className="text-xs font-medium">{item.title}</span>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  );
-                })}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          )}
-        </SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {projects === undefined ? (
+                <SidebarMenuItem>
+                  <div className="px-4 py-2 text-xs text-muted-foreground">Loading...</div>
+                </SidebarMenuItem>
+              ) : chats.length === 0 ? (
+                <SidebarMenuItem>
+                  <div className="px-4 py-2 text-xs text-muted-foreground">No projects yet</div>
+                </SidebarMenuItem>
+              ) : (
+                chats.map((chat) => {
+                const href = activeWorkshopSlug ? `/${activeWorkshopSlug}/threads/${chat.slug}` : "#";
+                const isActive = pathname === href;
+                return (
+                  <SidebarMenuItem key={chat._id}>
+                    <SidebarMenuButton
+                      isActive={isActive}
+                      onClick={() => activeWorkshopSlug && router.push(href)}
+                      tooltip={chat.name}
+                      className={cn(
+                        "hover:bg-accent transition-all",
+                        isActive ? "bg-accent text-accent-foreground" : "text-muted-foreground",
+                      )}
+                    >
+                      {chat.isPinned ? <Pin className="size-3.5 text-orange-500" /> : <Search className="size-3.5" />}
+                      <span className="text-xs truncate">{chat.name}</span>
+                      {chat.classificationId && <Folder className="ml-auto size-3 text-muted-foreground" />}
+                    </SidebarMenuButton>
 
-        {/* Projects Group */}
-        <SidebarGroup>
-          <SidebarGroupLabel 
-            className="text-[10px] uppercase tracking-widest text-neutral-500 px-4 mb-2 cursor-pointer hover:text-white transition-colors flex items-center justify-between"
-            onClick={() => toggleGroup('projects')}
-          >
-            Recent Designs
-            <ChevronDown className={cn("size-3 transition-transform duration-200", !expandedGroups.projects && "-rotate-90")} />
-          </SidebarGroupLabel>
-          {expandedGroups.projects && (
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {projects === undefined ? (
-                  Array.from({ length: 3 }).map((_, i) => (
-                    <SidebarMenuItem key={i}>
-                      <Skeleton className="h-8 w-full rounded-md mx-2" />
-                    </SidebarMenuItem>
-                  ))
-                ) : projects.length === 0 ? (
-                  <div className="px-4 py-2 text-[10px] text-neutral-600 uppercase tracking-tighter">
-                    No designs yet
-                  </div>
-                ) : (
-                  projects.slice(0, 5).map((project) => {
-                    const projectUrl = `/${activeWorkshopSlug}/threads/${project.slug}`;
-                    const isActive = pathname === projectUrl;
-                    
-                    return (
-                      <SidebarMenuItem key={project._id}>
-                        {editingProjectId === project._id ? (
-                          <div className="px-2 py-1 flex items-center gap-2 w-full">
-                            <input
-                              autoFocus
-                              value={editingName}
-                              onChange={(e) => setEditingName(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') handleSubmitRename();
-                                if (e.key === 'Escape') setEditingProjectId(null);
-                              }}
-                              onBlur={handleSubmitRename}
-                              className="bg-background border border-primary/50 rounded px-2 py-1 text-xs w-full focus:outline-none focus:ring-1 focus:ring-primary"
-                            />
-                          </div>
-                        ) : (
-                          <>
-                            <SidebarMenuButton 
-                              isActive={isActive}
-                              onClick={() => router.push(projectUrl)}
-                              tooltip={project.name}
-                              className={cn(
-                                "hover:bg-accent transition-all",
-                                isActive ? "bg-accent text-accent-foreground font-medium" : "text-muted-foreground hover:text-foreground"
-                              )}
-                            >
-                              <Sparkles className="size-3.5" />
-                              <span className="text-xs truncate">{project.name}</span>
-                              {project.isPinned && (
-                                <Pin className="size-3 ml-auto text-orange-500 fill-orange-500" />
-                              )}
-                            </SidebarMenuButton>
-                            
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <SidebarMenuAction showOnHover>
-                                  <MoreHorizontal className="size-4" />
-                                  <span className="sr-only">More</span>
-                                </SidebarMenuAction>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent side="right" align="start" className="w-48">
-                                <DropdownMenuItem onSelect={() => togglePinProject({ id: project._id })} className="flex items-center gap-2 cursor-pointer">
-                                  {project.isPinned ? <PinOff className="size-4" /> : <Pin className="size-4" />}
-                                  <span className="text-xs">{project.isPinned ? 'Unpin' : 'Pin'}</span>
-                                </DropdownMenuItem>
-                                
-                                <DropdownMenuItem onSelect={() => handleStartRename(project)} className="flex items-center gap-2 cursor-pointer">
-                                  <Pencil className="size-4" />
-                                  <span className="text-xs">Rename</span>
-                                </DropdownMenuItem>
-
-                                <DropdownMenuSeparator />
-                                
-                                <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground px-2 py-1.5">
-                                  Classification
-                                </DropdownMenuLabel>
-                                {classifications?.map((c) => (
-                                  <DropdownMenuItem 
-                                    key={c._id} 
-                                    onSelect={() => updateClassification({ id: project._id, classificationId: c._id })}
-                                    className="flex items-center gap-2 cursor-pointer"
-                                  >
-                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: c.color || '#fff' }} />
-                                    <span className="text-xs">{c.name}</span>
-                                    {project.classificationId === c._id && <Check className="size-3 ml-auto" />}
-                                  </DropdownMenuItem>
-                                ))}
-
-                                <DropdownMenuSeparator />
-                                
-                                <DropdownMenuItem 
-                                  onSelect={() => {
-                                    setTimeout(() => {
-                                      if (confirm("Are you sure you want to delete this design?")) {
-                                        deleteProject({ id: project._id });
-                                        if (isActive) router.push(`/${activeWorkshopSlug}/products`);
-                                      }
-                                    }, 100);
-                                  }}
-                                  className="flex items-center gap-2 cursor-pointer text-destructive hover:text-destructive/90"
-                                >
-                                  <Trash2 className="size-4" />
-                                  <span className="text-xs">Delete</span>
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </>
-                        )}
-                      </SidebarMenuItem>
-                    );
-                  })
-                )}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          )}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <SidebarMenuAction showOnHover>
+                          <MoreHorizontal className="size-4" />
+                          <span className="sr-only">Chat actions</span>
+                        </SidebarMenuAction>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent side="right" align="start" className="w-52">
+                        <DropdownMenuItem onSelect={() => togglePinProject({ id: chat._id })}>
+                          {chat.isPinned ? <PinOff className="mr-2 size-4" /> : <Pin className="mr-2 size-4" />}
+                          <span>{chat.isPinned ? "Unpin chat" : "Pin chat"}</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                          Add to Folder
+                        </DropdownMenuLabel>
+                        <DropdownMenuItem onSelect={() => updateClassification({ id: chat._id, classificationId: undefined })}>
+                          No Folder
+                        </DropdownMenuItem>
+                        {(classifications ?? []).map((folder) => (
+                          <DropdownMenuItem
+                            key={folder._id}
+                            onSelect={() => updateClassification({ id: chat._id, classificationId: folder._id })}
+                          >
+                            <span className="mr-2 h-2 w-2 rounded-full" style={{ backgroundColor: folder.color || "#999" }} />
+                            <span>{folder.name}</span>
+                          </DropdownMenuItem>
+                        ))}
+                        <DropdownMenuItem onSelect={handleCreateFolder}>
+                          <FolderPlus className="mr-2 size-4" />
+                          <span>New Folder</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          variant="destructive"
+                          onSelect={() => {
+                            if (confirm("Delete this chat?")) {
+                              void deleteProject({ id: chat._id as Id<"projects"> });
+                              if (isActive && activeWorkshopSlug) {
+                                router.push(`/${activeWorkshopSlug}/research`);
+                              }
+                            }
+                          }}
+                        >
+                          <Trash2 className="mr-2 size-4" />
+                          <span>Delete chat</span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </SidebarMenuItem>
+                );
+              })
+              )}
+            </SidebarMenu>
+          </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+
       <SidebarFooter className="p-4 border-t border-border">
         {session && (
           <SidebarMenu>
             <SidebarMenuItem>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <SidebarMenuButton 
-                    size="lg" 
-                    className="hover:bg-accent"
-                    tooltip="Account"
-                  >
+                  <SidebarMenuButton size="lg" className="hover:bg-accent" tooltip="Account">
                     <Avatar className="h-6 w-6 border border-border">
                       <AvatarImage src={session.user.image || undefined} alt={session.user.name} />
                       <AvatarFallback className="bg-muted text-[8px] uppercase">
@@ -324,48 +256,14 @@ export function AppSidebar() {
                     </div>
                   </SidebarMenuButton>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent side="right" align="end" className="w-56" sideOffset={12}>
-                  <DropdownMenuLabel className="font-normal">
-                    <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium leading-none">{session.user.name}</p>
-                      <p className="text-xs leading-none text-muted-foreground">
-                        {session.user.email}
-                      </p>
-                    </div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground px-2 py-1.5">
-                    Theme
-                  </DropdownMenuLabel>
-                  <DropdownMenuItem onSelect={() => setTheme(theme === "dark" ? "light" : "dark")} className="flex items-center gap-2">
-                    {theme === "dark" ? (
-                      <>
-                        <Sun className="h-4 w-4" />
-                        <span>Light Mode</span>
-                      </>
-                    ) : (
-                      <>
-                        <Moon className="h-4 w-4" />
-                        <span>Dark Mode</span>
-                      </>
-                    )}
+                <DropdownMenuContent side="right" align="end" className="w-52" sideOffset={10}>
+                  <DropdownMenuItem onSelect={() => setTheme(theme === "dark" ? "light" : "dark")}>
+                    {theme === "dark" ? <Sun className="mr-2 h-4 w-4" /> : <Moon className="mr-2 h-4 w-4" />}
+                    <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>
                   </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onSelect={() => router.push(`/${activeWorkshopSlug}/settings/pricing`)}>
-                    <CreditCard className="mr-2 h-4 w-4" />
-                    <span>Pricing</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => router.push(`/${activeWorkshopSlug}/settings/usage`)}>
-                    <Activity className="mr-2 h-4 w-4" />
-                    <span>Usage</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => router.push('/settings/profile')}>
-                    <User className="mr-2 h-4 w-4" />
-                    <span>Settings</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
+                  <DropdownMenuItem
                     variant="destructive"
-                    onSelect={() => authClient.signOut({ fetchOptions: { onSuccess: () => router.push('/') } })}
+                    onSelect={() => authClient.signOut({ fetchOptions: { onSuccess: () => router.push("/") } })}
                   >
                     <LogOut className="mr-2 h-4 w-4" />
                     <span>Log out</span>

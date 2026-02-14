@@ -5,6 +5,7 @@ import { Analytics } from "@vercel/analytics/next"
 import { SmoothScroll } from "@/components/smooth-scroll"
 import { ConvexClientProvider } from "@/components/ConvexClientProvider"
 import { ThemeProvider } from "@/components/theme-provider"
+import { getToken } from "@/lib/auth-server"
 import "./globals.css"
 
 const ibmPlexSans = IBM_Plex_Sans({
@@ -41,11 +42,12 @@ export const metadata: Metadata = {
 import { Suspense } from "react"
 import { Navigation } from "@/components/navigation"
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const token = await getToken();
   return (
     <html lang="en" suppressHydrationWarning>
       <body
@@ -57,7 +59,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <ConvexClientProvider>
+          <ConvexClientProvider initialToken={token}>
             <div className="noise-overlay" aria-hidden="true" />
             <Suspense fallback={null}>
               <Navigation />

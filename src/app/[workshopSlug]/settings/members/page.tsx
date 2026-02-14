@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from "@/components/ui/button";
-import { UserPlus, MoreVertical, Shield } from 'lucide-react';
+import { UserPlus, MoreVertical } from 'lucide-react';
 import { useWorkshop } from "@/hooks/use-workshop";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
@@ -13,6 +13,7 @@ export default function MembersPage() {
   const { activeWorkshopId } = useWorkshop();
   const inviteMember = useMutation(api.workshops.inviteMember);
   const members = useQuery(api.workshops.getMembers, activeWorkshopId ? { workshopId: activeWorkshopId } : "skip");
+  const pendingInvites = useQuery(api.workshops.listInvites, activeWorkshopId ? { workshopId: activeWorkshopId } : "skip");
 
   const handleInvite = async () => {
     if (!activeWorkshopId) return;
@@ -79,6 +80,20 @@ export default function MembersPage() {
               <Skeleton key={i} className="h-20 w-full rounded-xl" />
             ))}
           </div>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <H3 className="text-sm font-medium">Pending Invites</H3>
+        {(pendingInvites || []).length === 0 ? (
+          <Muted className="text-xs">No pending invites.</Muted>
+        ) : (
+          pendingInvites?.map((invite) => (
+            <div key={invite._id} className="p-3 bg-neutral-900/40 border border-white/5 rounded-lg">
+              <div className="text-xs">{invite.email}</div>
+              <div className="text-[10px] text-neutral-500 mt-1">Role: {invite.role}</div>
+            </div>
+          ))
         )}
       </div>
     </div>

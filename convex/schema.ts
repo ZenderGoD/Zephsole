@@ -1,6 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-import { authTables } from "./authSchema";
+import { tables as authTables } from "./betterAuth/schema";
 
 export default defineSchema({
   ...authTables,
@@ -41,6 +41,7 @@ export default defineSchema({
     slug: v.string(),
     ownerId: v.string(),
     createdAt: v.number(),
+    // Deprecated summary field. Credit balance should be derived from creditGrants.
     credits: v.optional(v.number()),
   }).index("by_slug", ["slug"])
     .index("by_owner", ["ownerId"]),
@@ -53,6 +54,21 @@ export default defineSchema({
   }).index("by_workshop", ["workshopId"])
     .index("by_user", ["userId"])
     .index("by_workshop_user", ["workshopId", "userId"]),
+
+  workshopInvites: defineTable({
+    workshopId: v.id("workshops"),
+    inviterUserId: v.string(),
+    email: v.string(),
+    role: v.union(v.literal("admin"), v.literal("member")),
+    token: v.string(),
+    status: v.union(v.literal("pending"), v.literal("accepted"), v.literal("revoked"), v.literal("expired")),
+    expiresAt: v.number(),
+    acceptedByUserId: v.optional(v.string()),
+    acceptedAt: v.optional(v.number()),
+    createdAt: v.number(),
+  }).index("by_token", ["token"])
+    .index("by_workshop_status", ["workshopId", "status"])
+    .index("by_email_status", ["email", "status"]),
   
   productBaselines: defineTable({
     projectId: v.id("projects"),
@@ -165,6 +181,7 @@ export default defineSchema({
     userId: v.string(),
     totalUses: v.number(),
     lastMilestoneRewardCount: v.number(), // Number of uses when they last got the 5-use bonus
+    preferredWorkshopId: v.optional(v.id("workshops")),
   }).index("by_user", ["userId"]),
 
   designContext: defineTable({
@@ -226,8 +243,12 @@ export default defineSchema({
     ),
     prompt: v.optional(v.string()),
     aspectRatio: v.optional(v.string()),
-    url: v.optional(v.string()), // Generated image URL
-    storageKey: v.optional(v.string()),
+    url: v.optional(v.string()), // Generated image URL (first image for backward compatibility)
+    storageKey: v.optional(v.string()), // First image storage key
+    images: v.optional(v.array(v.object({
+      url: v.string(),
+      storageKey: v.string(),
+    }))), // All generated images
     model: v.optional(v.string()),
     error: v.optional(v.string()),
     createdAt: v.number(),
@@ -257,7 +278,20 @@ export default defineSchema({
     projectId: v.optional(v.id("projects")),
     userId: v.optional(v.string()),
     assetType: v.optional(v.union(v.literal("image"), v.literal("video"), v.literal("3d"), v.literal("research"))),
+    usageContext: v.optional(
+      v.union(
+        v.literal("thread_asset"),
+        v.literal("project_asset"),
+        v.literal("upscale"),
+        v.literal("aspect_ratio_change"),
+        v.literal("technical_draft"),
+        v.literal("research"),
+        v.literal("misc"),
+      ),
+    ),
     description: v.optional(v.string()),
+    refId: v.optional(v.string()),
+    ctcUsd: v.optional(v.number()),
     idempotencyKey: v.optional(v.string()),
   }).index("by_workshop_usage", ["workshopId", "usageAt"])
     .index("by_workshop_idem", ["workshopId", "idempotencyKey"]),
@@ -279,4 +313,32 @@ export default defineSchema({
     order: v.optional(v.number()),
     createdAt: v.number(),
   }).index("by_type", ["type"]),
+
+  falKeys: defineTable({
+    name: v.string(),
+    key: v.string(),
+    enabled: v.boolean(),
+    capacity: v.number(),
+    weight: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_name", ["name"])
+    .index("by_enabled", ["enabled"]),
+
+  falKeyLoad: defineTable({
+    keyName: v.string(),
+    activeOperations: v.number(),
+    capacity: v.number(),
+    lastUpdated: v.number(),
+  }).index("by_key_name", ["keyName"]),
+
+  falHealthChecks: defineTable({
+    status: v.union(v.literal("healthy"), v.literal("degraded"), v.literal("critical")),
+    enabledKeys: v.number(),
+    overloadedKeys: v.number(),
+    staleLoadEntries: v.number(),
+    notes: v.optional(v.string()),
+    createdAt: v.number(),
+  }).index("by_createdAt", ["createdAt"]),
 });

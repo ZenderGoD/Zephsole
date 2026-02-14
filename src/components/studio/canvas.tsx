@@ -6,6 +6,20 @@ import { cn } from '@/lib/utils';
 import { motion, useMotionValue } from 'framer-motion';
 import { Maximize2, MousePointer2, Hand, ZoomIn, ZoomOut, Beaker, MessageSquare, ArrowRight } from 'lucide-react';
 import { TechnicalBlueprint } from './technical-blueprint';
+import { FullscreenImageViewer } from '@/components/ui/fullscreen-image-viewer';
+
+type TechnicalBlueprintData = {
+  productName: string;
+  imageUrl: string;
+  schematics: { type: string; url: string; description: string }[];
+  bom: { part: string; material: string; qty: number; cost: number }[];
+  specs: {
+    tolerances: string;
+    stitching: string;
+    finish: string;
+    weight: string;
+  };
+};
 
 interface GenerationCanvasProps {
   mode: GenMode;
@@ -14,10 +28,25 @@ interface GenerationCanvasProps {
   onItemMove?: (id: Id<"canvasItems"> | string, x: number, y: number) => void;
 }
 
+// Helper function to safely access nested data properties
+function getNestedDataProperty(
+  data: Record<string, unknown> | undefined,
+  property: string
+): string | undefined {
+  if (!data || typeof data !== 'object') return undefined;
+  const value = data[property];
+  return value !== undefined && value !== null ? String(value) : undefined;
+}
+
 export function GenerationCanvas({ mode, isGenerating, items = [], onItemMove }: GenerationCanvasProps) {
   const [scale, setScale] = useState(1);
   const [isPanning, setIsPanning] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  
+  // Fullscreen image viewer state
+  const [fullscreenImages, setFullscreenImages] = useState<Array<{ url: string; alt?: string }>>([]);
+  const [fullscreenIndex, setFullscreenIndex] = useState(0);
+  const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
   
   const x = useMotionValue(0);
   const y = useMotionValue(0);
@@ -128,26 +157,34 @@ export function GenerationCanvas({ mode, isGenerating, items = [], onItemMove }:
               )}
             >
               {item.type === 'technical-blueprint' ? (
-                <TechnicalBlueprint data={item.data as any} />
+                <TechnicalBlueprint data={item.data as TechnicalBlueprintData} />
               ) : (
                 <>
                   <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-3 font-mono flex items-center justify-between">
                     <span>{item.type.replace('-', ' ')}</span>
-                    {((item.data as any)?.source === 'research' || ((item.data as any)?.data as any)?.source === 'research') && (
+                    {(item.data?.source === 'research' || (item.data?.data && typeof item.data.data === 'object' && 'source' in item.data.data && item.data.data.source === 'research')) && (
                       <span className="bg-emerald-500/10 text-emerald-500 px-1.5 py-0.5 rounded text-[8px] border border-emerald-500/20">
                         RESEARCH
                       </span>
                     )}
                   </div>
-                  {item.type === 'image' && (item.data as any)?.imageUrl ? (
+                  {item.type === 'image' && item.data?.imageUrl ? (
                     <div className="space-y-2">
                       <img 
-                        src={(item.data as any).imageUrl} 
-                        alt={(item.data as any)?.title || 'Canvas upload'} 
-                        className="w-full h-40 object-cover rounded-lg border border-border"
+                        src={item.data.imageUrl} 
+                        alt={item.data.title || 'Canvas upload'} 
+                        className="w-full h-40 object-cover rounded-lg border border-border cursor-pointer hover:opacity-90 transition-opacity"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (item.data.imageUrl) {
+                            setFullscreenImages([{ url: item.data.imageUrl, alt: item.data.title || 'Canvas image' }]);
+                            setFullscreenIndex(0);
+                            setIsFullscreenOpen(true);
+                          }
+                        }}
                       />
                       <div className="text-xs text-foreground leading-relaxed">
-                        {(item.data as any)?.title || (item.data as any)?.content || 'Image upload'}
+                        {item.data.title || item.data.content || 'Image upload'}
                       </div>
                     </div>
                   ) : item.type === 'sole-spec' ? (
@@ -159,34 +196,50 @@ export function GenerationCanvas({ mode, isGenerating, items = [], onItemMove }:
                       <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                         <div className="space-y-0.5">
                           <div className="text-[8px] uppercase text-neutral-500 font-mono">Midsole</div>
-                          <div className="text-[10px] text-foreground font-medium truncate">{(item.data as any)?.data?.midsoleMaterial}</div>
+                          <div className="text-[10px] text-foreground font-medium truncate">
+                            {getNestedDataProperty(item.data?.data as Record<string, unknown> | undefined, 'midsoleMaterial') || ''}
+                          </div>
                         </div>
                         <div className="space-y-0.5">
                           <div className="text-[8px] uppercase text-neutral-500 font-mono">Outsole</div>
-                          <div className="text-[10px] text-foreground font-medium truncate">{(item.data as any)?.data?.outsoleMaterial}</div>
+                          <div className="text-[10px] text-foreground font-medium truncate">
+                            {getNestedDataProperty(item.data?.data as Record<string, unknown> | undefined, 'outsoleMaterial') || ''}
+                          </div>
                         </div>
                         <div className="space-y-0.5">
                           <div className="text-[8px] uppercase text-neutral-500 font-mono">Stack/Drop</div>
-                          <div className="text-[10px] text-foreground font-medium">{(item.data as any)?.data?.stackHeightHeel}/{(item.data as any)?.data?.stackHeightForefoot} | {(item.data as any)?.data?.drop}mm</div>
+                          <div className="text-[10px] text-foreground font-medium">
+                            {item.data?.data && typeof item.data.data === 'object' 
+                              ? `${getNestedDataProperty(item.data.data as Record<string, unknown>, 'stackHeightHeel') || ''}/${getNestedDataProperty(item.data.data as Record<string, unknown>, 'stackHeightForefoot') || ''} | ${getNestedDataProperty(item.data.data as Record<string, unknown>, 'drop') || ''}mm`
+                              : ''}
+                          </div>
                         </div>
                         <div className="space-y-0.5">
                           <div className="text-[8px] uppercase text-neutral-500 font-mono">Plate</div>
-                          <div className="text-[10px] text-foreground font-medium">{(item.data as any)?.data?.plateType}</div>
+                          <div className="text-[10px] text-foreground font-medium">
+                            {getNestedDataProperty(item.data?.data as Record<string, unknown> | undefined, 'plateType') || ''}
+                          </div>
                         </div>
                       </div>
                       <div className="pt-2 border-t border-border flex justify-between items-center">
-                        <span className="text-[9px] font-bold text-emerald-500">${(item.data as any)?.data?.costEst}</span>
-                        <span className="text-[9px] text-muted-foreground">{(item.data as any)?.data?.weightEst}g</span>
+                        <span className="text-[9px] font-bold text-emerald-500">
+                          ${getNestedDataProperty(item.data?.data as Record<string, unknown> | undefined, 'costEst') || '0'}
+                        </span>
+                        <span className="text-[9px] text-muted-foreground">
+                          {getNestedDataProperty(item.data?.data as Record<string, unknown> | undefined, 'weightEst') 
+                            ? `${getNestedDataProperty(item.data?.data as Record<string, unknown> | undefined, 'weightEst')}g` 
+                            : ''}
+                        </span>
                       </div>
                     </div>
                   ) : (
                     <div className="text-xs text-foreground leading-relaxed">
-                      {(item.data as any)?.content || 'No intelligence data provided.'}
+                      {item.data?.content || 'No intelligence data provided.'}
                     </div>
                   )}
                   <div className="mt-4 pt-4 border-t border-border flex items-center justify-between">
                     <div className="flex gap-1">
-                      {((item.data as any)?.source === 'research' || ((item.data as any)?.data as any)?.source === 'research') ? (
+                      {(item.data?.source === 'research' || (item.data?.data && typeof item.data.data === 'object' && 'source' in item.data.data && item.data.data.source === 'research')) ? (
                         <button 
                           onClick={() => {
                             window.dispatchEvent(new CustomEvent('switch-workspace-mode', { detail: 'research' }));
@@ -269,6 +322,14 @@ export function GenerationCanvas({ mode, isGenerating, items = [], onItemMove }:
       {/* Mode-specific Deco */}
       <div className="absolute inset-0 pointer-events-none border-40 border-transparent transition-all duration-500" 
            style={{ borderColor: isGenerating ? 'rgba(255,255,255,0.02)' : 'transparent' }} />
+      
+      {/* Fullscreen Image Viewer */}
+      <FullscreenImageViewer
+        images={fullscreenImages}
+        initialIndex={fullscreenIndex}
+        open={isFullscreenOpen}
+        onClose={() => setIsFullscreenOpen(false)}
+      />
     </div>
   );
 }

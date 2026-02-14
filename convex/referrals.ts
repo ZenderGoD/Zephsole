@@ -1,21 +1,53 @@
 import { mutation, query, internalMutation } from "./_generated/server";
-import { v } from "convex/values";
+import type { MutationCtx } from "./_generated/server";
+import { ConvexError, v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
+import { internal } from "./_generated/api";
+import { requireAuthUserId } from "./authUtils";
 
 const MILESTONE_SIZE = 5;
 const MILESTONE_REWARD = 5.00; // $5.00 for every 5 referrals
 
+async function resolveRewardWorkshopId(ctx: Pick<MutationCtx, "db">, userId: string) {
+  const stats = await ctx.db
+    .query("referralStats")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .first();
+
+  const preferredWorkshopId = stats?.preferredWorkshopId;
+  if (preferredWorkshopId) {
+    const membership = await ctx.db
+      .query("workshopMembers")
+      .withIndex("by_workshop_user", (q) =>
+        q.eq("workshopId", preferredWorkshopId).eq("userId", userId),
+      )
+      .first();
+    if (membership) return preferredWorkshopId as Id<"workshops">;
+  }
+
+  const membership = await ctx.db
+    .query("workshopMembers")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .first();
+  return membership?.workshopId as Id<"workshops"> | undefined;
+}
+
 export const getReferralStats = query({
-  args: { userId: v.string() },
-  handler: async (ctx, args) => {
+  args: {},
+  handler: async (ctx) => {
+    const userId = await requireAuthUserId(ctx);
     const stats = await ctx.db
       .query("referralStats")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .withIndex("by_user", (q) => q.eq("userId", userId))
       .first();
-    
-    const user = await ctx.db
+
+    let user = await ctx.db
       .query("user")
-      .withIndex("userId", (q) => q.eq("userId", args.userId))
+      .withIndex("userId", (q) => q.eq("userId", userId))
       .first();
+    if (!user) {
+      user = await ctx.db.get(userId as Id<"user">);
+    }
 
     return {
       totalUses: stats?.totalUses || 0,
@@ -25,12 +57,16 @@ export const getReferralStats = query({
 });
 
 export const ensureReferralCode = mutation({
-  args: { userId: v.string() },
-  handler: async (ctx, args) => {
-    const user = await ctx.db
+  args: {},
+  handler: async (ctx) => {
+    const userId = await requireAuthUserId(ctx);
+    let user = await ctx.db
       .query("user")
-      .withIndex("userId", (q) => q.eq("userId", args.userId))
+      .withIndex("userId", (q) => q.eq("userId", userId))
       .first();
+    if (!user) {
+      user = await ctx.db.get(userId as Id<"user">);
+    }
 
     if (!user) return null;
     if (user.referralCode) return user.referralCode;
@@ -50,11 +86,9 @@ export const ensureReferralCode = mutation({
 });
 
 export const registerReferral = mutation({
-  args: { 
-    referralCode: v.string(), 
-    newUserId: v.string() 
-  },
+  args: { referralCode: v.string() },
   handler: async (ctx, args) => {
+    const newUserId = await requireAuthUserId(ctx);
     // 1. Find the referrer
     const referrer = await ctx.db
       .query("user")
@@ -62,19 +96,22 @@ export const registerReferral = mutation({
       .first();
 
     if (!referrer) return { success: false, error: "Invalid referral code" };
-    if (referrer.userId === args.newUserId) return { success: false, error: "Cannot refer yourself" };
+    const referrerIdentity = (referrer.userId || referrer._id) as string;
+    if (referrerIdentity === newUserId) {
+      return { success: false, error: "Cannot refer yourself" };
+    }
 
     // 2. Check if this user was already referred
     const existing = await ctx.db
       .query("referrals")
-      .withIndex("by_referred", (q) => q.eq("referredId", args.newUserId))
+      .withIndex("by_referred", (q) => q.eq("referredId", newUserId))
       .first();
     if (existing) return { success: false, error: "User already referred" };
 
     // 3. Create the referral record
     await ctx.db.insert("referrals", {
-      referrerId: referrer.userId as string,
-      referredId: args.newUserId,
+      referrerId: referrerIdentity,
+      referredId: newUserId,
       status: "joined",
       createdAt: Date.now(),
     });
@@ -82,12 +119,13 @@ export const registerReferral = mutation({
     // 4. Update referral stats and check for milestone
     let stats = await ctx.db
       .query("referralStats")
-      .withIndex("by_user", (q) => q.eq("userId", referrer.userId as string))
+      .withIndex("by_user", (q) => q.eq("userId", referrerIdentity))
       .first();
 
     if (!stats) {
       const statsId = await ctx.db.insert("referralStats", {
-        userId: referrer.userId as string,
+        userId: referrerIdentity,
+        // Source of truth is auth user identity.
         totalUses: 1,
         lastMilestoneRewardCount: 0,
       });
@@ -101,23 +139,12 @@ export const registerReferral = mutation({
 
     // 5. Check milestone reward (every 5 uses)
     if (stats && stats.totalUses >= stats.lastMilestoneRewardCount + MILESTONE_SIZE) {
-      // Find the referrer's primary workshop to add credits
-      const primaryWorkshop = await ctx.db
-        .query("workshops")
-        .withIndex("by_owner", (q) => q.eq("ownerId", referrer.userId as string))
-        .first();
+      const rewardWorkshopId = await resolveRewardWorkshopId(ctx, referrerIdentity);
 
-      if (primaryWorkshop) {
-        await ctx.db.patch(primaryWorkshop._id, {
-          credits: (primaryWorkshop.credits || 0) + MILESTONE_REWARD,
-        });
-
-        await ctx.db.insert("creditGrants", {
-          workshopId: primaryWorkshop._id,
+      if (rewardWorkshopId) {
+        await ctx.runMutation(internal.credits.grantCredits, {
+          workshopId: rewardWorkshopId,
           amount: MILESTONE_REWARD,
-          remaining: MILESTONE_REWARD,
-          startsAt: Date.now(),
-          expiresAt: Date.now() + 30 * 86_400_000,
           source: "referral",
         });
         
@@ -154,24 +181,43 @@ export const processPurchaseReward = internalMutation({
     // Award 10% of purchase amount to referrer
     const rewardAmount = args.purchaseAmount * 0.10;
     
-    const referrerWorkshop = await ctx.db
-      .query("workshops")
-      .withIndex("by_owner", (q) => q.eq("ownerId", referral.referrerId))
-      .first();
+    const rewardWorkshopId = await resolveRewardWorkshopId(ctx, referral.referrerId);
 
-    if (referrerWorkshop) {
-      await ctx.db.patch(referrerWorkshop._id, {
-        credits: (referrerWorkshop.credits || 0) + rewardAmount,
-      });
-
-      await ctx.db.insert("creditGrants", {
-        workshopId: referrerWorkshop._id,
+    if (rewardWorkshopId) {
+      await ctx.runMutation(internal.credits.grantCredits, {
+        workshopId: rewardWorkshopId,
         amount: rewardAmount,
-        remaining: rewardAmount,
-        startsAt: Date.now(),
-        expiresAt: Date.now() + 30 * 86_400_000,
         source: "referral_purchase",
       });
     }
+  },
+});
+
+export const setPreferredRewardWorkshop = mutation({
+  args: { workshopId: v.id("workshops") },
+  handler: async (ctx, args) => {
+    const userId = await requireAuthUserId(ctx);
+    const membership = await ctx.db
+      .query("workshopMembers")
+      .withIndex("by_workshop_user", (q) =>
+        q.eq("workshopId", args.workshopId).eq("userId", userId),
+      )
+      .first();
+    if (!membership) throw new ConvexError("WORKSHOP_ACCESS_DENIED");
+
+    const stats = await ctx.db
+      .query("referralStats")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .first();
+    if (!stats) {
+      await ctx.db.insert("referralStats", {
+        userId,
+        totalUses: 0,
+        lastMilestoneRewardCount: 0,
+        preferredWorkshopId: args.workshopId,
+      });
+      return;
+    }
+    await ctx.db.patch(stats._id, { preferredWorkshopId: args.workshopId });
   },
 });
